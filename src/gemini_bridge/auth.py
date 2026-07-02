@@ -6,12 +6,13 @@ Credential loading for all supported authentication methods.
 Responsibilities:
   - Load Application Default Credentials (ADC) — default method
   - Load service account credentials from GOOGLE_APPLICATION_CREDENTIALS env var
-  - Load service account credentials from Apple Keychain (macOS, reserved for v2.5)
+  - Load service account credentials from Apple Keychain (macOS)
   - Build a google.auth.credentials.Credentials instance for any configured method
 
 Design notes:
   - Single Responsibility: credential loading only; SDK client construction is in client.py
-  - Open/Closed: add a new method by adding a loader function + one branch in build_credentials()
+  - Open/Closed: add a new method by adding a loader function + one entry in _LOADERS —
+    build_credentials() requires no modification
   - Liskov Substitution: all paths return google.auth.credentials.Credentials; callers are agnostic
   - Dependency Inversion: client.py depends on the Credentials abstraction, not concrete loaders
 
@@ -19,7 +20,7 @@ Raises:
   AuthError — wraps all credential failures with actionable messages for Claude to surface
 
 Used by:  client.py -> build_client()
-Imports:  config.py (AuthConfig, AuthMethod)
+Imports:  config.py (AuthConfig, ConfigError)
 """
 
 import json
@@ -35,12 +36,16 @@ from gemini_bridge.config import AuthConfig, ConfigError
 
 _VERTEX_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
+# All loaders receive the full AuthConfig so parameterized methods (keychain)
+# can access their fields without special-casing in build_credentials().
+_CredLoader = Callable[[AuthConfig], google.auth.credentials.Credentials]
+
 
 class AuthError(Exception):
     """Raised when credential loading fails. Message is user-actionable."""
 
 
-def _load_adc() -> google.auth.credentials.Credentials:
+def _load_adc(auth_config: AuthConfig) -> google.auth.credentials.Credentials:
     try:
         credentials, _ = google.auth.default(scopes=_VERTEX_SCOPES)
         return credentials
@@ -51,7 +56,7 @@ def _load_adc() -> google.auth.credentials.Credentials:
         ) from exc
 
 
-def _load_env() -> google.auth.credentials.Credentials:
+def _load_env(auth_config: AuthConfig) -> google.auth.credentials.Credentials:
     """Load service account credentials from GOOGLE_APPLICATION_CREDENTIALS env var."""
     try:
         credentials, _ = google.auth.default(scopes=_VERTEX_SCOPES)
@@ -63,8 +68,10 @@ def _load_env() -> google.auth.credentials.Credentials:
         ) from exc
 
 
-def _load_keychain(service: str, account: str) -> google.auth.credentials.Credentials:
+def _load_keychain(auth_config: AuthConfig) -> google.auth.credentials.Credentials:
     """Load service account JSON from Apple Keychain (macOS only)."""
+    service = auth_config.keychain_service
+    account = auth_config.keychain_account
     try:
         result = subprocess.run(
             ["security", "find-generic-password", "-s", service, "-a", account, "-w"],
@@ -94,20 +101,16 @@ def _load_keychain(service: str, account: str) -> google.auth.credentials.Creden
     return service_account.Credentials.from_service_account_info(sa_info, scopes=_VERTEX_SCOPES)
 
 
-_CredLoader = Callable[[], google.auth.credentials.Credentials]
-
 _LOADERS: dict[str, _CredLoader] = {
     "adc": _load_adc,
     "env": _load_env,
+    "keychain": _load_keychain,
 }
 
 
 def build_credentials(auth_config: AuthConfig) -> google.auth.credentials.Credentials:
     """Build credentials from the given auth config. Raises AuthError on failure."""
-    method = auth_config.method
-    if method == "keychain":
-        return _load_keychain(auth_config.keychain_service, auth_config.keychain_account)
-    loader = _LOADERS.get(method)
+    loader = _LOADERS.get(auth_config.method)
     if loader is None:
-        raise ConfigError(f"Unknown auth method: {method!r}")
-    return loader()
+        raise ConfigError(f"Unknown auth method: {auth_config.method!r}")
+    return loader(auth_config)
