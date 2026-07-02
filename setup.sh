@@ -29,7 +29,7 @@ echo
 # --- auth method ---
 echo "Auth method:"
 echo "  1) adc — Application Default Credentials (recommended)"
-echo "  2) env — GOOGLE_APPLICATION_CREDENTIALS env var"
+echo "  2) env — GOOGLE_APPLICATION_CREDENTIALS env var (service account key file)"
 AUTH_CHOICE=$(ask "Choice" "1")
 case "$AUTH_CHOICE" in
     1|adc) AUTH_METHOD="adc" ;;
@@ -43,6 +43,19 @@ if [[ "$AUTH_METHOD" == "adc" ]]; then
         error "ADC not configured. Run: gcloud auth application-default login"
     fi
     info "ADC OK"
+fi
+
+if [[ "$AUTH_METHOD" == "env" ]]; then
+    if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+        echo "  Note: GOOGLE_APPLICATION_CREDENTIALS is not set in this shell."
+        echo "  Set it before starting Claude Code:"
+        echo "    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa-key.json"
+        echo "  (Proceeding — you can set the env var later)"
+    elif [[ ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]]; then
+        error "GOOGLE_APPLICATION_CREDENTIALS is set but file not found: ${GOOGLE_APPLICATION_CREDENTIALS}"
+    else
+        info "GOOGLE_APPLICATION_CREDENTIALS OK: ${GOOGLE_APPLICATION_CREDENTIALS}"
+    fi
 fi
 
 # --- project ---

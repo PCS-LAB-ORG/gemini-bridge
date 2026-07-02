@@ -41,22 +41,31 @@ from this refresh token — no repeated re-auth.
 
 ---
 
-## Method 2: Env File SA (v1 Fallback)
+## Method 2: Env File SA
 
-Set an environment variable pointing to a service account key file **before starting Claude Code**:
+Use a service account key file on disk. Set the environment variable **before starting Claude Code** — the server reads it at startup:
 
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa-key.json
 ```
 
-The SDK picks up `GOOGLE_APPLICATION_CREDENTIALS` automatically as part of ADC fallback.
+The SDK picks up `GOOGLE_APPLICATION_CREDENTIALS` automatically as part of ADC credential discovery.
 
-**Config:**
+**Setup steps:**
+1. Create or download a service account key in GCP IAM → Service Accounts → Keys
+2. Grant the SA `roles/aiplatform.user` on your project
+3. Store the JSON file in a secure location (e.g. `~/.config/gemini-bridge/sa-key.json`, mode 600)
+4. Export the env var in your shell profile or before starting Claude Code
+5. Run `bash setup.sh` and select option 2
+
+**Config written by setup.sh:**
 ```json
 {"auth": {"method": "env"}}
 ```
 
-**Caution:** The key file persists on disk. Use only on full-disk-encrypted machines.
+`setup.sh` verifies the env var is set and the file exists. If the var is not set in the setup shell, it warns but continues — you can set it later before starting Claude Code.
+
+**Caution:** The key file persists on disk. Use only on full-disk-encrypted machines with restricted file permissions (`chmod 600`).
 
 ---
 
