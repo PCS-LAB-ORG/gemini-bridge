@@ -1,119 +1,111 @@
 <h1 align="center">gemini-bridge</h1>
-<h4 align="center">Gemini as a live sounding board for Claude Code — Vertex AI, ADC auth, persistent sessions.</h4>
+<h4 align="center">Gemini as a live sounding board for Claude Code — via Vertex AI, ADC auth, persistent sessions.</h4>
 
-<div align="center">
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/python-3.11+-blue.svg">
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-1.28-green.svg">
+  <img alt="Vertex AI" src="https://img.shields.io/badge/Vertex%20AI-Gemini-orange.svg">
+  <img alt="Auth" src="https://img.shields.io/badge/auth-ADC-purple.svg">
+</p>
 
-![Python](https://img.shields.io/badge/python-3.11+-blue?style=flat-square)
-![MCP](https://img.shields.io/badge/MCP-1.28-6366F1?style=flat-square)
-![Vertex AI](https://img.shields.io/badge/Vertex%20AI-Gemini-4285F4?style=flat-square&logo=google-cloud&logoColor=white)
-![Auth](https://img.shields.io/badge/auth-ADC%20%7C%20Keychain-green?style=flat-square)
+gemini-bridge is an MCP server that gives Claude Code a live Gemini counterpart. When Claude
+is working on a hard problem — an architectural decision, a tricky bug, a code review — it can
+consult Gemini as a second opinion without switching tools or context.
 
-</div>
+Sessions persist across all tool calls within a Claude Code session. Gemini accumulates context
+naturally. Every exchange is appended to a Markdown transcript file for the session.
 
-An MCP server that gives Claude Code a live Gemini counterpart during development sessions.
-Five specialized tools — brainstorm, review, debug, architect, and ask — share a persistent
-Gemini chat session for the lifetime of the Claude Code process. Every exchange is appended
-to a session transcript so nothing is lost.
+Five focused tools, each with a distinct system prompt persona. Not a 37-tool Swiss Army knife.
 
-Authentication uses Google Cloud Application Default Credentials via Vertex AI — no API
-keys, no credential files on disk.
-
-> **Status:** Under active development. See [plan.md](plan.md) for full specification and
-> [docs/roadmap.md](docs/roadmap.md) for the phased delivery plan.
-
----
-
-### Quick navigation
-
-[What it does](#what-it-does) | [Prerequisites](#prerequisites) | [Quick start](#quick-start) | [Project structure](#project-structure)
-[Architecture](#architecture) | [Configuration](#configuration) | [Auth methods](#auth-methods) | [Full Documentation](docs/README.md)
+**Quick navigation:** [What it does](#what-it-does) | [Prerequisites](#prerequisites) | [Quick start](#quick-start) | [Project structure](#project-structure) | [Architecture](#architecture) | [Configuration](#configuration) | [Auth methods](#auth-methods) | [Tools](#tools) | [Full documentation](#full-documentation)
 
 ---
 
 ## What it does
 
-Five MCP tools that Claude Code can invoke against a shared Gemini session:
+| Tool | Persona | Parameters |
+|---|---|---|
+| `gemini_ask` | Direct, precise — general purpose | `prompt` |
+| `gemini_brainstorm` | Devil's advocate, unconventional | `topic`, `context?` |
+| `gemini_review` | Critical, severity-first | `content`, `question?` |
+| `gemini_debug` | Evidence-based, hypothesis-driven | `error`, `context?` |
+| `gemini_architect` | Opinionated, explicit tradeoffs | `description`, `question?` |
 
-| Tool | Purpose |
-|---|---|
-| `gemini_brainstorm` | Divergent ideation — Gemini challenges Claude's direction, offers alternatives |
-| `gemini_review` | Critical code or design review — finds problems, prioritizes by severity |
-| `gemini_debug` | Root cause hypotheses from evidence — systematic, not speculative |
-| `gemini_architect` | System design tradeoffs — opinionated where warranted |
-| `gemini_ask` | General purpose — when no specialized tool fits |
+All tools share optional `thinking` (`none`/`low`/`medium`/`high`) and `session_name` parameters.
 
-All tools share a single persistent Gemini chat session. Gemini accumulates context
-naturally across multiple tool calls within one Claude Code session. Every exchange is
-appended to `session-summaries/YYYYMMDD-HHMM-gemini-transcript.md`.
+**Session model:** One default Gemini chat object per server process. All calls within a Claude
+Code session share the same history.
 
-Optional `thinking` parameter (`none` | `low` | `medium` | `high`) — Claude judges
-appropriate depth per call. Server translates to the correct API parameter for whichever
-Gemini model is configured.
+**Transcript logging:** Every exchange is appended to
+`{transcript_dir}/YYYYMMDD-HHMM-gemini-transcript.md`.
 
 ---
 
 ## Prerequisites
 
-| Requirement | Version | Notes |
-|---|---|---|
-| Python | 3.11+ | `python3 --version` |
-| gcloud CLI | any recent | `gcloud --version` |
-| ADC credentials | — | `gcloud auth application-default login` |
-| Claude Code | MCP-capable | `claude --version` |
+| Requirement | Notes |
+|---|---|
+| Python 3.11+ | `python3 --version` |
+| gcloud CLI | [Install guide](https://cloud.google.com/sdk/docs/install) |
+| ADC configured | `gcloud auth application-default login` (once) |
+| Vertex AI enabled | Enable in your GCP project |
+| Claude Code | MCP-enabled version |
 
 ---
 
 ## Quick start
 
-### 1. Clone and install
-
 ```bash
+# 1. Clone and install
 git clone https://github.com/PCS-LAB-ORG/gemini-bridge.git
 cd gemini-bridge
-python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
-```
 
-### 2. Configure
-
-```bash
+# 2. Configure (interactive wizard)
 bash setup.sh
-```
 
-The wizard checks your ADC credentials, prompts for GCP project and Gemini model,
-and writes `~/.config/gemini-bridge/config.json`.
-
-### 3. Register with Claude Code
-
-```bash
+# 3. Register with Claude Code
 claude mcp add -s user gemini-bridge python -m gemini_bridge
+
+# 4. Verify
+claude mcp list
 ```
 
-Verify: `claude mcp list` — `gemini-bridge` should appear.
+Restart Claude Code after step 3.
 
 ---
 
 ## Project structure
 
 ```
-src/gemini_bridge/
-  __main__.py         # entry point: python -m gemini_bridge
-  server.py           # MCP server, tool registration
-  client.py           # GeminiClient, persistent session state
-  config.py           # load/validate ~/.config/gemini-bridge/config.json
-  auth.py             # ADC, Keychain SA, env-file credential loading
-  transcript.py       # session transcript append
-  tools/
-    base.py           # ToolResult type, shared parameter definitions
-    ask.py
-    brainstorm.py
-    review.py
-    debug.py
-    architect.py
-
-docs/                 # full documentation (see docs/README.md)
-setup.sh              # interactive configure wizard
-tests/                # one test file per source module
+gemini-bridge/
+├── pyproject.toml
+├── setup.sh                    # interactive configuration wizard
+├── session-summaries/          # default transcript location during development
+├── docs/
+│   ├── README.md               # documentation index
+│   ├── architecture.md
+│   ├── auth.md
+│   ├── configuration.md
+│   ├── tools.md
+│   ├── transcripts.md
+│   ├── development.md
+│   └── roadmap.md
+└── src/
+    └── gemini_bridge/
+        ├── __main__.py         # entry: python -m gemini_bridge
+        ├── server.py           # MCP server, tool registration
+        ├── client.py           # Gemini session manager, ask()
+        ├── config.py           # config.json loading and validation
+        ├── auth.py             # credential loading (ADC, env, Keychain)
+        ├── transcript.py       # session transcript writing
+        └── tools/
+            ├── base.py         # ToolResult type, call_gemini() helper
+            ├── ask.py
+            ├── brainstorm.py
+            ├── review.py
+            ├── debug.py
+            └── architect.py
 ```
 
 ---
@@ -123,55 +115,75 @@ tests/                # one test file per source module
 ```mermaid
 flowchart LR
     CC[Claude Code] -->|MCP tool call| S[server.py]
-    S --> T[tools/*.py]
-    T -->|ask session| C[client.py]
-    C -->|google-genai| V[Vertex AI — Gemini]
+    S -->|registered tool fn| T[tools/*.py]
+    T -->|call_gemini| C[client.py]
+    C -->|send_message| V[Vertex AI / Gemini]
     V -->|response| C
-    C --> TR[transcript.py]
-    TR -->|append| F[session-summaries/*.md]
-    C --> T
-    T --> S
-    S -->|tool result| CC
+    T -->|append| TX[transcript.py]
+    TX --> F[YYYYMMDD-HHMM-gemini-transcript.md]
+    T -->|ToolResult str| CC
 ```
 
-Auth is Application Default Credentials throughout. No API keys. No credential files
-on disk (Keychain option available in v2.5 for service account auth).
+**Startup:** `__main__.py` loads config → builds credentials → instantiates `GeminiClient` +
+`TranscriptWriter` → `build_server()` registers all 5 tools → `server.run()`.
 
 ---
 
 ## Configuration
 
-Config file: `~/.config/gemini-bridge/config.json`
+**Config file:** `~/.config/gemini-bridge/config.json` (created by `setup.sh`)
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `project` | string | — | GCP project ID for Vertex AI billing |
-| `location` | string | `us-central1` | Vertex AI region |
-| `model` | string | `gemini-2.5-flash` | Gemini model ID |
-| `default_thinking` | string | `medium` | Thinking level when tool call omits `thinking` param |
-| `transcript_dir` | string | `~/session-summaries` | Where to write transcript files |
-| `auth.method` | string | `adc` | Auth method: `adc`, `env`, or `keychain` (v2.5) |
+| Field | Default | Description |
+|---|---|---|
+| `project` | — | GCP project ID (required) |
+| `location` | `us-central1` | Vertex AI region |
+| `model` | `gemini-2.5-flash` | Gemini model ID |
+| `default_thinking` | `medium` | Thinking level when omitted per call |
+| `transcript_dir` | `~/session-summaries` | Transcript directory |
+| `auth.method` | `adc` | `adc`, `env`, or `keychain` (v2.5) |
 
-Run `bash setup.sh` to create or update this file interactively.
+See [docs/configuration.md](docs/configuration.md) for full reference.
 
 ---
 
 ## Auth methods
 
-**ADC (default)** — `gcloud auth application-default login` once. The SDK auto-refreshes
-access tokens using the stored refresh token. No re-auth required during normal use.
-Works with any Vertex AI-enabled GCP project.
+**ADC (default):** `gcloud auth application-default login` once. SDK auto-refreshes.
+`gcloud auth login` and ADC are separate credential stores — see [docs/auth.md](docs/auth.md).
 
-**Env file** — Set `GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa-key.json` before starting
-Claude Code. Least preferred — leaves a credential file on disk.
+**Env file (fallback):** `GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa-key.json`.
 
-**Apple Keychain (v2.5 roadmap)** — Service account JSON stored in macOS Keychain, loaded
-into process memory at startup, never written to disk. The recommended approach for
-service account auth. See [docs/auth.md](docs/auth.md).
+**Keychain (v2.5 roadmap):** SA JSON in Apple Keychain, loaded to memory at startup. macOS only.
 
 ---
 
-## Full Documentation
+## Tools
 
-[docs/README.md](docs/README.md) — complete documentation index including architecture,
-auth setup, tool reference, transcript format, development guide, and roadmap.
+See [docs/tools.md](docs/tools.md) for system prompts, parameter docs, and examples.
+
+**Thinking levels** — Claude picks per call based on complexity:
+
+| Level | Gemini 2.x (`thinking_budget`) | Gemini 3.x (`thinking_level`) |
+|---|---|---|
+| `none` | 0 tokens | MINIMAL |
+| `low` | 1024 tokens | LOW |
+| `medium` | 8192 tokens | MEDIUM |
+| `high` | 32768 tokens | HIGH |
+
+---
+
+## Known limitations / roadmap
+
+See [docs/roadmap.md](docs/roadmap.md) for the full v1–v5 roadmap with rationale.
+
+v1 → single session, ADC auth, 5 tools, transcript logging
+v1.1 → env-file SA auth
+v2 → named sessions
+v2.5 → Keychain auth (macOS)
+v3 → per-project transcript routing
+
+---
+
+## Full documentation
+
+See [docs/README.md](docs/README.md) for the complete documentation index.
