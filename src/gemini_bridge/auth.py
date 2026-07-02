@@ -91,8 +91,19 @@ def _load_keychain(auth_config: AuthConfig) -> google.auth.credentials.Credentia
             "Gemini auth error: 'security' CLI not found. Keychain auth requires macOS."
         ) from exc
 
+    raw = result.stdout.strip()
+    # macOS Keychain stores multi-line values (like SA JSON) as binary and returns
+    # them as a lowercase hex string via security(1) -w. Detect and decode.
+    if raw and all(c in "0123456789abcdef" for c in raw):
+        try:
+            raw = bytes.fromhex(raw).decode("utf-8")
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise AuthError(
+                "Gemini auth error: Keychain value could not be decoded.\n"
+                "Fix: re-run setup.sh to re-store the service account key."
+            ) from exc
     try:
-        sa_info = json.loads(result.stdout.strip())
+        sa_info = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise AuthError(
             "Gemini auth error: Keychain value is not valid service account JSON.\n"
