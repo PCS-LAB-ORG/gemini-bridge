@@ -152,8 +152,7 @@ fi
 
 # --- project ---
 # Prefer gcloud active project; fall back to existing config value
-DEFAULT_PROJECT=$(gcloud config get-value project 2>/dev/null || true)
-[[ -z "$DEFAULT_PROJECT" && -n "$PREV_PROJECT" ]] && DEFAULT_PROJECT="$PREV_PROJECT"
+DEFAULT_PROJECT="${PREV_PROJECT:-$(gcloud config get-value project 2>/dev/null || true)}"
 PROJECT=$(ask "GCP project" "$DEFAULT_PROJECT")
 [[ -z "$PROJECT" ]] && error "GCP project is required."
 
