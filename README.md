@@ -88,7 +88,7 @@ Restart Claude Code after step 3. On next start you'll see startup entries in th
 | `location` | `global` | Vertex AI location; `global` works for all models; specific regions for gemini-2.x only |
 | `model` | `gemini-2.5-flash` | Gemini model ID (`gemini-2.*` or `gemini-3.*`) |
 | `default_thinking` | `medium` | Thinking level when omitted per call |
-| `transcript_dir` | `~/session-summaries` | Directory for exchange transcripts |
+| `transcript_dir` | `./session-summaries` | Transcript directory; relative paths resolve to the project root where Claude Code was launched |
 | `auth.method` | `adc` | `adc` · `env` · `keychain` |
 | `auth.keychain_service` | `gemini-bridge` | Keychain service name (keychain method only) |
 | `auth.keychain_account` | `vertex-sa` | Keychain account name (keychain method only) |
