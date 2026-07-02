@@ -87,11 +87,3 @@ when approaching the Gemini context limit.
 **Why deferred:** Gemini 2.5/3.x has a 1M+ token context window. A typical Claude Code
 session's tool calls will not approach this limit. This becomes relevant only for very long
 multi-day sessions where session state is not reset.
-
-### Upstream Contribution to rlabs/gemini-mcp (v5.0)
-
-Evaluate contributing Vertex AI + ADC auth back to the rlabs/gemini-mcp project as an upstream PR.
-
-The rlabs project (MIT) is TypeScript, stateless, and API-key-only. Vertex AI auth and
-persistent sessions would be a meaningful addition. Whether to pursue this depends on the
-maintainers' interest and the effort of TypeScript translation.
