@@ -554,6 +554,88 @@ claude mcp list
 
 ---
 
+## GitOps Workflow
+
+This project's GitOps model differs from the global CLAUDE.md defaults. The project-level
+`CLAUDE.md` in the repo root overrides the global rules where noted below.
+
+### Branch Model
+
+```
+main          ← protected; merge target only; PR required from develop
+develop       ← integration branch; no direct commits (hook enforced)
+  ├── feature/issue-{N}-short-description
+  ├── fix/issue-{N}-short-description
+  └── chore/issue-{N}-short-description
+```
+
+### The Squash + No-FF Hybrid
+
+One GitHub issue = one branch = one squash commit merged to develop with `--no-ff`.
+
+This keeps develop's history clean (one meaningful commit per issue) while the `--no-ff`
+merge creates a merge commit that preserves the branch integration audit trail.
+
+**Workflow for every feature/fix:**
+
+```bash
+# 1. Branch from develop
+git checkout develop
+git checkout -b feature/issue-N-short-description
+
+# 2. Work freely — multiple WIP commits, all pre-commit hooks fire normally
+git commit -m "wip: initial structure"
+git commit -m "wip: fix edge case"
+
+# 3. Before merging: squash all branch commits into one clean commit
+git rebase -i develop
+# In the editor: keep the first, fixup/squash the rest
+# Rewrite the final commit message:
+#   feat: implement config module (#N)
+#
+#   Why this change: ...
+
+# 4. Merge to develop — --no-verify is ONLY permitted here
+git checkout develop
+git merge --no-ff --no-verify feature/issue-N-short-description
+git push origin develop
+
+# 5. Clean up
+git branch -d feature/issue-N-short-description
+git push origin --delete feature/issue-N-short-description
+```
+
+### --no-verify Policy
+
+`--no-verify` is **only permitted** on the `git merge --no-ff` step when merging a feature
+branch into `develop`. This bypasses the `no-commit-to-branch` pre-commit hook (which would
+otherwise block any commit whose target is `develop`).
+
+It is **never permitted**:
+- On feature branch commits (hooks must run on all working commits)
+- On `develop → main` PRs (CI enforces this)
+- To skip ruff, mypy, or bandit on any commit
+
+### PR Workflow (develop → main only)
+
+PRs are only created for `develop → main` merges. Feature branches merge directly to
+`develop` via the squash + no-ff workflow above.
+
+`develop → main` PR checklist:
+- All CI checks pass (ruff, mypy, tests, semgrep, trivy)
+- Milestone version is complete (all issues closed)
+- PR body contains `Relates to #N` for all issues included — never `Closes #N`
+
+### Project CLAUDE.md Overrides
+
+The project-level `CLAUDE.md` in the gemini-bridge repo root captures all of the above.
+Key overrides from global CLAUDE.md:
+- `--no-verify` is permitted on squash-merge step to develop (global: never)
+- No PR required for feature → develop (global: PR for all merges to main/develop)
+- Squash + rebase before merge is the standard (global: no squash requirement)
+
+---
+
 ## Resolved Decisions
 
 - **Language**: Python 3.11+

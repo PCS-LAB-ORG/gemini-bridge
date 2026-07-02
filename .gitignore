@@ -28,7 +28,8 @@ htmlcov/
 *credentials*.json
 
 # Session artifacts (local only)
-session-summaries/
+session-summaries/*
+!session-summaries/.gitkeep
 logs/
 
 # IDE
