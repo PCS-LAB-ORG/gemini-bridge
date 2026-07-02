@@ -100,3 +100,27 @@ def test_config_keychain_auth_defaults() -> None:
     assert cfg.auth.method == "keychain"
     assert cfg.auth.keychain_service == "gemini-bridge"
     assert cfg.auth.keychain_account == "vertex-sa"
+
+
+def test_adc_config_keychain_fields_are_none() -> None:
+    from gemini_bridge.config import AuthConfig
+
+    cfg = AuthConfig(method="adc")
+    assert cfg.keychain_service is None
+    assert cfg.keychain_account is None
+
+
+def test_env_config_keychain_fields_are_none() -> None:
+    from gemini_bridge.config import AuthConfig
+
+    cfg = AuthConfig(method="env")
+    assert cfg.keychain_service is None
+    assert cfg.keychain_account is None
+
+
+def test_keychain_explicit_service_account_preserved() -> None:
+    from gemini_bridge.config import AuthConfig
+
+    cfg = AuthConfig(method="keychain", keychain_service="my-svc", keychain_account="my-acct")
+    assert cfg.keychain_service == "my-svc"
+    assert cfg.keychain_account == "my-acct"

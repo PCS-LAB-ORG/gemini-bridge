@@ -23,7 +23,7 @@ Imports:  (stdlib + pydantic only)
 
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, field_validator, model_validator
 
@@ -39,8 +39,18 @@ class ConfigError(Exception):
 
 class AuthConfig(BaseModel):
     method: AuthMethod = "adc"
-    keychain_service: str = "gemini-bridge"
-    keychain_account: str = "vertex-sa"
+    # None for adc/env; defaults applied by validator when method="keychain"
+    keychain_service: Optional[str] = None
+    keychain_account: Optional[str] = None
+
+    @model_validator(mode="after")
+    def apply_keychain_defaults(self) -> "AuthConfig":
+        if self.method == "keychain":
+            if self.keychain_service is None:
+                self.keychain_service = "gemini-bridge"
+            if self.keychain_account is None:
+                self.keychain_account = "vertex-sa"
+        return self
 
 
 class Config(BaseModel):
