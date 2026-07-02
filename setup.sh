@@ -144,7 +144,16 @@ if [[ "$AUTH_METHOD" == "keychain" ]]; then
         echo "    rm /path/to/sa-key.json   # remove disk copy"
         error "Keychain item '$KEYCHAIN_SERVICE'/'$KEYCHAIN_ACCOUNT' not found. Store it first, then re-run setup."
     fi
-    if ! echo "$SECRET" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
+    # Validate JSON — pipe directly from security to avoid echo variable-expansion issues.
+    # macOS stores multi-line values as binary and returns them hex-encoded via -w; decode first.
+    if ! security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w 2>/dev/null | \
+        python3 -c "
+import sys, json
+raw = sys.stdin.read().strip()
+if raw and all(c in '0123456789abcdef' for c in raw):
+    raw = bytes.fromhex(raw).decode('utf-8')
+json.loads(raw)
+" 2>/dev/null; then
         error "Keychain item found but is not valid JSON. Re-store the service account key."
     fi
     info "Keychain item OK"
