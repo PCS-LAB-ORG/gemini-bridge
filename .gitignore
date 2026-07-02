@@ -28,8 +28,12 @@ htmlcov/
 *credentials*.json
 
 # Session artifacts (local only)
-session-summaries/
+session-summaries/*
+!session-summaries/.gitkeep
 logs/
+
+# Internal review artifacts (local only — not user-facing docs)
+code-reviews/
 
 # IDE
 .vscode/

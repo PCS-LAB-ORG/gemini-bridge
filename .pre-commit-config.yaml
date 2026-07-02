@@ -1,0 +1,43 @@
+# Pre-commit hook configuration — copy to repo root as .pre-commit-config.yaml
+# Setup (once per developer, per repo):
+#   pip install pre-commit
+#   pre-commit install
+#   pre-commit install --hook-type commit-msg
+#   pre-commit run --all-files   # run on existing codebase to establish baseline
+
+repos:
+  # Ruff: fast Python linter + formatter (replaces flake8, isort, black)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.10
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # Bandit: Python security scanner (SQL injection, subprocess misuse, hardcoded secrets)
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - id: bandit
+        args: ["-c", "pyproject.toml"]
+
+  # Semgrep OSS: SAST pattern matching — runs fully offline, no SaaS login required
+  - repo: https://github.com/semgrep/semgrep
+    rev: v1.79.0
+    hooks:
+      - id: semgrep
+        args: ["--config=p/python", "--config=p/secrets", "--error"]
+        # SEMGREP_APP_TOKEN intentionally unset = OSS mode, no Semgrep Cloud
+
+  # pre-commit-hooks: essential safety checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: detect-private-key          # blocks credentials before they leave the machine
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, develop]   # enforces branching policy at git layer
+      - id: check-merge-conflict        # catches unresolved merge markers
+      - id: check-yaml
+      - id: check-json
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
