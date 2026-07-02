@@ -21,10 +21,12 @@ Used by:  tools/*.py (via append_exchange() after each Gemini response)
 Imports:  config.py (Config)
 """
 
-import sys
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+_log = logging.getLogger(__name__)
 
 
 class TranscriptWriter:
@@ -56,7 +58,7 @@ class TranscriptWriter:
             with self._path.open("a", encoding="utf-8") as fh:
                 fh.write(block)
         except OSError as exc:
-            print(f"gemini-bridge: transcript write failed: {exc}", file=sys.stderr)
+            _log.warning("transcript write failed: %s", exc)
 
 
 def _format_exchange(

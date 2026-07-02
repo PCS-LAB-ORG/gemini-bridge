@@ -22,7 +22,10 @@ Used by:  tools/*.py (via ask()), server.py (instantiates GeminiClient at startu
 Imports:  config.py (Config, ThinkingLevel), auth.py (build_credentials)
 """
 
+import logging
 from typing import Optional
+
+_log = logging.getLogger(__name__)
 
 import google.auth.credentials
 from google import genai
@@ -106,10 +109,14 @@ class GeminiClient:
         """Send prompt to chat session, return response text. Raises ClientError on failure."""
         effective_thinking: ThinkingLevel = thinking or self._config.default_thinking
         gen_config = self._build_generation_config(effective_thinking)
+        _log.debug("ask: thinking=%s prompt_len=%d", effective_thinking, len(prompt))
         try:
             response = session.send_message(prompt, config=gen_config)
         except Exception as exc:
+            _log.error("inference failed: %s", exc)
             raise ClientError(f"Gemini inference failed: {exc}") from exc
         if not response.text:
+            _log.warning("Gemini returned an empty response")
             raise ClientError("Gemini returned an empty response.")
+        _log.debug("response_len=%d", len(response.text))
         return response.text
