@@ -34,6 +34,9 @@ logs/
 # Internal review artifacts (local only — not user-facing docs)
 code-reviews/
 
+# Claude Code instructions (internal — not for public distribution)
+CLAUDE.md
+
 # IDE
 .vscode/
 .idea/
