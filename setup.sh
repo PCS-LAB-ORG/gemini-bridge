@@ -9,6 +9,7 @@ CONFIG_DIR="$HOME/.config/gemini-bridge"
 CONFIG_FILE="$CONFIG_DIR/config.json"
 
 info()  { printf '\033[0;32m%s\033[0m\n' "$*"; }
+warn()  { printf '\033[0;33mWARN: %s\033[0m\n' "$*" >&2; }
 error() { printf '\033[0;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 
 ask() {
@@ -28,12 +29,14 @@ echo
 
 # --- auth method ---
 echo "Auth method:"
-echo "  1) adc — Application Default Credentials (recommended)"
-echo "  2) env — GOOGLE_APPLICATION_CREDENTIALS env var (service account key file)"
+echo "  1) adc     — Application Default Credentials (recommended)"
+echo "  2) env     — GOOGLE_APPLICATION_CREDENTIALS env var (service account key file)"
+echo "  3) keychain — Service account JSON stored in Apple Keychain (macOS only)"
 AUTH_CHOICE=$(ask "Choice" "1")
 case "$AUTH_CHOICE" in
-    1|adc) AUTH_METHOD="adc" ;;
-    2|env) AUTH_METHOD="env" ;;
+    1|adc)      AUTH_METHOD="adc" ;;
+    2|env)      AUTH_METHOD="env" ;;
+    3|keychain) AUTH_METHOD="keychain" ;;
     *) error "Invalid choice: $AUTH_CHOICE" ;;
 esac
 
@@ -47,7 +50,7 @@ fi
 
 if [[ "$AUTH_METHOD" == "env" ]]; then
     if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
-        echo "  Note: GOOGLE_APPLICATION_CREDENTIALS is not set in this shell."
+        warn "GOOGLE_APPLICATION_CREDENTIALS is not set in this shell."
         echo "  Set it before starting Claude Code:"
         echo "    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa-key.json"
         echo "  (Proceeding — you can set the env var later)"
@@ -56,6 +59,40 @@ if [[ "$AUTH_METHOD" == "env" ]]; then
     else
         info "GOOGLE_APPLICATION_CREDENTIALS OK: ${GOOGLE_APPLICATION_CREDENTIALS}"
     fi
+fi
+
+# Keychain auth: prompt for service/account names and verify the item exists
+KEYCHAIN_SERVICE="gemini-bridge"
+KEYCHAIN_ACCOUNT="vertex-sa"
+
+if [[ "$AUTH_METHOD" == "keychain" ]]; then
+    if [[ "$(uname)" != "Darwin" ]]; then
+        error "Keychain auth requires macOS. Use adc or env on Linux."
+    fi
+    echo
+    echo "Keychain item to read at server startup:"
+    KEYCHAIN_SERVICE=$(ask "Keychain service name" "gemini-bridge")
+    KEYCHAIN_ACCOUNT=$(ask "Keychain account name" "vertex-sa")
+    # Reject chars that would break JSON string interpolation in config.json
+    if [[ "$KEYCHAIN_SERVICE" =~ [\"\\] ]] || [[ "$KEYCHAIN_ACCOUNT" =~ [\"\\] ]]; then
+        error "Keychain service/account names must not contain quotes or backslashes."
+    fi
+    echo
+    info "Verifying keychain item..."
+    if ! SECRET=$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w 2>/dev/null); then
+        echo "  Keychain item not found."
+        echo "  Store your service account JSON first:"
+        echo "    security add-generic-password \\"
+        echo "      -s \"$KEYCHAIN_SERVICE\" \\"
+        echo "      -a \"$KEYCHAIN_ACCOUNT\" \\"
+        echo "      -w \"\$(cat /path/to/sa-key.json)\""
+        echo "    rm /path/to/sa-key.json   # remove disk copy"
+        error "Keychain item '$KEYCHAIN_SERVICE'/'$KEYCHAIN_ACCOUNT' not found. Store it first, then re-run setup."
+    fi
+    if ! echo "$SECRET" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
+        error "Keychain item found but is not valid JSON. Re-store the service account key."
+    fi
+    info "Keychain item OK"
 fi
 
 # --- project ---
@@ -89,9 +126,7 @@ else
     echo "  global — recommended; routes to lowest-latency region automatically"
     echo "  us-central1, us-east4, europe-west1, asia-northeast1, etc."
     LOCATION=$(ask "Location" "global")
-    if [[ -z "$LOCATION" ]]; then
-        error "Location is required."
-    fi
+    [[ -z "$LOCATION" ]] && error "Location is required."
 fi
 
 # --- thinking level ---
@@ -113,6 +148,20 @@ TRANSCRIPT_DIR=$(ask "Transcript directory" "~/session-summaries")
 
 # --- write config ---
 mkdir -p "$CONFIG_DIR"
+
+# Build auth JSON block — keychain method includes service/account fields
+if [[ "$AUTH_METHOD" == "keychain" ]]; then
+    AUTH_JSON="\"auth\": {
+    \"method\": \"keychain\",
+    \"keychain_service\": \"$KEYCHAIN_SERVICE\",
+    \"keychain_account\": \"$KEYCHAIN_ACCOUNT\"
+  }"
+else
+    AUTH_JSON="\"auth\": {
+    \"method\": \"$AUTH_METHOD\"
+  }"
+fi
+
 cat > "$CONFIG_FILE" <<EOF
 {
   "project": "$PROJECT",
@@ -120,9 +169,7 @@ cat > "$CONFIG_FILE" <<EOF
   "model": "$MODEL",
   "default_thinking": "$THINKING",
   "transcript_dir": "$TRANSCRIPT_DIR",
-  "auth": {
-    "method": "$AUTH_METHOD"
-  }
+  $AUTH_JSON
 }
 EOF
 

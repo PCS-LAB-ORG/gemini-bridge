@@ -18,16 +18,13 @@ credential management beyond one-time setup. Scope is intentionally narrow.
 
 ---
 
-## v1.1 — Env File Auth Fallback
+## v1.1 — Env File Auth Fallback ✓ Shipped
 
 **Feature:** Env-file service account fallback (`GOOGLE_APPLICATION_CREDENTIALS`).
 
-Already implemented in auth.py (`method: "env"`). Full test coverage included in v1.0.
-This is a documentation and setup.sh enhancement — configuring the env var, adding
-the method to the wizard.
-
-**Why deferred:** ADC covers the primary use case. Env-file auth is a lower-security
-fallback for environments where ADC isn't viable.
+`auth.py` (`_load_env()`) was implemented in v1.0. v1.1 added setup.sh verification:
+checks the env var is set and the file exists, warns non-fatally if not set in the
+current shell. Docs updated with step-by-step SA setup instructions.
 
 ---
 
@@ -44,22 +41,20 @@ architecture already supports this — `_sessions` is a dict keyed by name.
 
 ---
 
-## v2.5 — Apple Keychain Auth (macOS)
+## v2.5 — Apple Keychain Auth (macOS) ✓ Shipped
 
 **Feature:** Service account JSON stored in Apple Keychain, loaded to memory at server
 startup, zero disk artifact after initial store.
 
-**Why Keychain over a disk file:** A SA JSON on disk is a persistent secret at rest. Keychain
-provides OS-managed storage with ACL enforcement. The MCP server reads once at startup and
-the raw bytes disappear when the process exits.
+`auth.py` (`_load_keychain()`) was implemented and tested in v1.0. v2.5 added setup.sh
+support: option 3 in the auth wizard, prompts for keychain service/account names, verifies
+the item exists and contains valid JSON, writes `keychain_service`/`keychain_account` fields
+to config.json. Docs updated with full setup instructions.
 
 **Minimum SA role:** `roles/aiplatform.user` — grants `aiplatform.endpoints.predict` only.
 
-**Already stubbed:** `auth.py` has `_load_keychain()` implemented and tested. v2.5 is
-setup.sh updates + documentation + removing the "macOS only" limitation note from the wizard.
-
 **macOS only:** The `security` CLI is macOS-specific. Linux equivalents (secret-tool, pass)
-are out of scope for this phase.
+are out of scope.
 
 ---
 

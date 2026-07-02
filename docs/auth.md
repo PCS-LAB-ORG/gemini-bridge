@@ -69,11 +69,13 @@ The SDK picks up `GOOGLE_APPLICATION_CREDENTIALS` automatically as part of ADC c
 
 ---
 
-## Method 3: Apple Keychain (v2.5 Roadmap)
+## Method 3: Apple Keychain (macOS only)
 
-Store the service account JSON in macOS Keychain — loaded to memory at startup, zero disk artifact.
+Store the service account JSON in Apple Keychain. The server reads it once at startup into memory — the raw JSON is never written to disk after the initial store, and disappears when the process exits.
 
-**One-time setup:**
+**Why Keychain over a disk file:** A SA JSON on disk is a persistent secret at rest. Keychain provides OS-managed storage with ACL enforcement. This is the preferred service account path for DLP-sensitive environments.
+
+**One-time setup — store the SA JSON:**
 ```bash
 security add-generic-password \
   -s "gemini-bridge" \
@@ -82,7 +84,9 @@ security add-generic-password \
 rm /path/to/sa-key.json   # remove disk copy immediately
 ```
 
-**Config:**
+**Run setup.sh and select option 3.** The wizard prompts for the service and account names, then verifies the item exists and contains valid JSON before writing config.
+
+**Config written by setup.sh:**
 ```json
 {
   "auth": {
@@ -92,6 +96,8 @@ rm /path/to/sa-key.json   # remove disk copy immediately
   }
 }
 ```
+
+**Minimum SA role:** `roles/aiplatform.user` — grants `aiplatform.endpoints.predict` only.
 
 macOS only. The `security` CLI is not available on Linux.
 
