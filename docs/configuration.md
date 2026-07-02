@@ -12,7 +12,7 @@ Created by `bash setup.sh`. Safe to edit by hand.
   "location": "global",
   "model": "gemini-2.5-flash",
   "default_thinking": "medium",
-  "transcript_dir": "~/session-summaries",
+  "transcript_dir": "./session-summaries",
   "auth": {
     "method": "adc"
   }
@@ -80,15 +80,16 @@ it judges a different level is appropriate.
 
 ### `transcript_dir`
 
-**Type:** string (path, `~` expanded)
-**Default:** `"~/session-summaries"`
+**Type:** string (path, `~` and `.` expanded relative to Claude Code's working directory)
+**Default:** `"./session-summaries"`
 
 Directory where transcript files are written. Created if it doesn't exist. Transcript files
 are named `YYYYMMDD-HHMM-gemini-transcript.md` using the server startup time.
 
-For project-specific routing, update this to the active project's `session-summaries/`
-directory. The v3 `gemini_set_transcript_dir` tool will allow per-session routing without
-a config edit.
+The default `./session-summaries` resolves relative to the project root where Claude Code
+was launched — transcripts land in `your-project/session-summaries/` automatically, one
+directory per project. Override with an absolute path (e.g. `"~/gemini-transcripts"`) to
+collect transcripts globally instead.
 
 ---
 

@@ -32,22 +32,24 @@ This means:
 
 ## Transcript directory
 
-**Default:** `~/session-summaries`
+**Default:** `./session-summaries` — resolved relative to the project root where Claude Code was launched.
 
 Configured in `transcript_dir` in `~/.config/gemini-bridge/config.json`.
 
 The directory is created if it doesn't exist. The server never fails to start due to a
 missing directory.
 
+**Per-project routing is automatic.** Launch Claude Code from `~/dev/my-project` and
+transcripts land in `~/dev/my-project/session-summaries/`. No config change needed when
+switching projects — the server inherits the working directory from Claude Code.
+
 ## Changing the transcript directory
 
-Edit `~/.config/gemini-bridge/config.json` and restart Claude Code:
+To override the default and collect all transcripts in one place, edit
+`~/.config/gemini-bridge/config.json` and restart Claude Code:
 ```json
-{"transcript_dir": "/path/to/my-project/session-summaries"}
+{"transcript_dir": "~/gemini-transcripts"}
 ```
-
-The v3 `gemini_set_transcript_dir(path)` tool will allow per-session routing without
-a config edit — useful when working across multiple projects.
 
 ## Write failure behavior
 

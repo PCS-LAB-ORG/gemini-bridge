@@ -58,7 +58,7 @@ class Config(BaseModel):
     location: str = "global"
     model: str = "gemini-2.5-flash"
     default_thinking: ThinkingLevel = "medium"
-    transcript_dir: str = "~/session-summaries"
+    transcript_dir: str = "./session-summaries"
     auth: AuthConfig = AuthConfig()
 
     @field_validator("model")
