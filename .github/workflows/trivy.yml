@@ -1,0 +1,28 @@
+# Trivy — dependency CVE scanner for requirements.txt / pyproject.toml
+# Vuln DB pulled from ghcr.io (GitHub/Microsoft infrastructure, no external SaaS)
+# Results: GitHub Security tab via SARIF upload
+name: Trivy
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request: {}
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+        if: always()
