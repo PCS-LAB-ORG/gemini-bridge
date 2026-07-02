@@ -14,9 +14,9 @@ error() { printf '\033[0;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 ask() {
     local prompt="$1" default="${2:-}"
     if [[ -n "$default" ]]; then
-        printf '%s [%s]: ' "$prompt" "$default"
+        printf '%s [%s]: ' "$prompt" "$default" >&2
     else
-        printf '%s: ' "$prompt"
+        printf '%s: ' "$prompt" >&2
     fi
     read -r REPLY
     echo "${REPLY:-$default}"
