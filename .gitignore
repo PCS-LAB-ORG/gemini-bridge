@@ -27,13 +27,15 @@ htmlcov/
 *-sa-key.json
 *credentials*.json
 
-# Session artifacts (local only)
-session-summaries/*
-!session-summaries/.gitkeep
+# Session artifacts (local only — not tracked in repo)
+session-summaries/
 logs/
 
 # Internal review artifacts (local only — not user-facing docs)
 code-reviews/
+
+# Claude Code instructions (internal — not for public distribution)
+CLAUDE.md
 
 # IDE
 .vscode/
