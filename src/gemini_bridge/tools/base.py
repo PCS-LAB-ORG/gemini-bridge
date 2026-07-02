@@ -20,9 +20,12 @@ Used by:  tools/ask.py, tools/brainstorm.py, tools/review.py, tools/debug.py, to
 Imports:  client.py (GeminiClient), transcript.py (TranscriptWriter), config.py (ThinkingLevel)
 """
 
+import logging
 from typing import Optional
 
 from gemini_bridge.client import ClientError, GeminiClient
+
+_log = logging.getLogger(__name__)
 from gemini_bridge.config import ThinkingLevel
 from gemini_bridge.transcript import TranscriptWriter
 
@@ -48,11 +51,14 @@ def call_gemini(
         system_instruction=system_instruction,
     )
     effective_thinking: ThinkingLevel = thinking or client._config.default_thinking
+    _log.debug("%s session=%r thinking=%s", tool_name, session_name, effective_thinking)
     try:
         response = client.ask(session, prompt, thinking)
     except ClientError as exc:
+        _log.error("%s session=%r failed: %s", tool_name, session_name, exc)
         return f"[gemini-bridge error] {exc}"
 
+    _log.debug("%s session=%r OK", tool_name, session_name)
     transcript.append(
         tool_name=tool_name,
         prompt=prompt,

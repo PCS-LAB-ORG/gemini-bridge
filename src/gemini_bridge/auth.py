@@ -24,8 +24,11 @@ Imports:  config.py (AuthConfig, ConfigError)
 """
 
 import json
+import logging
 import subprocess
 from typing import Callable
+
+_log = logging.getLogger(__name__)
 
 import google.auth
 import google.auth.credentials
@@ -48,8 +51,10 @@ class AuthError(Exception):
 def _load_adc(auth_config: AuthConfig) -> google.auth.credentials.Credentials:
     try:
         credentials, _ = google.auth.default(scopes=_VERTEX_SCOPES)
+        _log.debug("adc credentials loaded")
         return credentials
     except google.auth.exceptions.DefaultCredentialsError as exc:
+        _log.error("adc credential load failed: %s", exc)
         raise AuthError(
             "Gemini auth error: no ADC credentials found.\n"
             "Fix: gcloud auth application-default login"
@@ -60,8 +65,10 @@ def _load_env(auth_config: AuthConfig) -> google.auth.credentials.Credentials:
     """Load service account credentials from GOOGLE_APPLICATION_CREDENTIALS env var."""
     try:
         credentials, _ = google.auth.default(scopes=_VERTEX_SCOPES)
+        _log.debug("env credentials loaded")
         return credentials
     except google.auth.exceptions.DefaultCredentialsError as exc:
+        _log.error("env credential load failed: %s", exc)
         raise AuthError(
             "Gemini auth error: GOOGLE_APPLICATION_CREDENTIALS not set or file unreadable.\n"
             "Fix: export GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa-key.json"
@@ -81,12 +88,14 @@ def _load_keychain(auth_config: AuthConfig) -> google.auth.credentials.Credentia
             check=True,
         )
     except subprocess.CalledProcessError as exc:
+        _log.error("keychain item not found (service=%r, account=%r)", service, account)
         raise AuthError(
             f"Gemini auth error: Keychain item not found "
             f"(service={service!r}, account={account!r}).\n"
             "Fix: re-run setup.sh to store the service account key."
         ) from exc
     except FileNotFoundError as exc:
+        _log.error("security CLI not found — Keychain auth requires macOS")
         raise AuthError(
             "Gemini auth error: 'security' CLI not found. Keychain auth requires macOS."
         ) from exc
@@ -98,6 +107,7 @@ def _load_keychain(auth_config: AuthConfig) -> google.auth.credentials.Credentia
         try:
             raw = bytes.fromhex(raw).decode("utf-8")
         except (ValueError, UnicodeDecodeError) as exc:
+            _log.error("keychain value hex decode failed: %s", exc)
             raise AuthError(
                 "Gemini auth error: Keychain value could not be decoded.\n"
                 "Fix: re-run setup.sh to re-store the service account key."
@@ -105,10 +115,13 @@ def _load_keychain(auth_config: AuthConfig) -> google.auth.credentials.Credentia
     try:
         sa_info = json.loads(raw)
     except json.JSONDecodeError as exc:
+        _log.error("keychain value is not valid JSON: %s", exc)
         raise AuthError(
             "Gemini auth error: Keychain value is not valid service account JSON.\n"
             "Fix: re-run setup.sh to re-store the service account key."
         ) from exc
+
+    _log.debug("keychain credentials loaded (service=%r, account=%r)", service, account)
 
     return service_account.Credentials.from_service_account_info(sa_info, scopes=_VERTEX_SCOPES)
 
