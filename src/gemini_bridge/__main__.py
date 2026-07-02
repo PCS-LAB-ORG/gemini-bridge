@@ -82,7 +82,9 @@ def _configure_logging(startup_time: datetime) -> None:
 _startup_time = datetime.now()
 _configure_logging(_startup_time)
 
-_log = logging.getLogger(__name__)
+# Use explicit package path — __name__ is "__main__" when run via python3 -m gemini_bridge,
+# which is not a child of "gemini_bridge" and would bypass our file handler.
+_log = logging.getLogger("gemini_bridge.__main__")
 
 
 def main() -> None:
