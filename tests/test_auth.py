@@ -1,0 +1,108 @@
+"""Tests for gemini_bridge/auth.py — build_credentials() dispatch and error handling."""
+
+import json
+import subprocess
+from unittest.mock import MagicMock, patch
+
+import pytest
+from gemini_bridge.auth import AuthError, build_credentials
+from gemini_bridge.config import AuthConfig, ConfigError
+
+
+def _adc_config() -> AuthConfig:
+    return AuthConfig(method="adc")
+
+
+def _env_config() -> AuthConfig:
+    return AuthConfig(method="env")
+
+
+def _keychain_config() -> AuthConfig:
+    return AuthConfig(method="keychain", keychain_service="svc", keychain_account="acct")
+
+
+class TestADC:
+    def test_adc_returns_credentials(self) -> None:
+        mock_creds = MagicMock()
+        with patch("google.auth.default", return_value=(mock_creds, "project")):
+            result = build_credentials(_adc_config())
+        assert result is mock_creds
+
+    def test_adc_raises_auth_error_on_missing_creds(self) -> None:
+        import google.auth.exceptions
+
+        with patch(
+            "google.auth.default",
+            side_effect=google.auth.exceptions.DefaultCredentialsError("no creds"),
+        ):
+            with pytest.raises(AuthError, match="ADC"):
+                build_credentials(_adc_config())
+
+
+class TestEnv:
+    def test_env_returns_credentials(self) -> None:
+        mock_creds = MagicMock()
+        with patch("google.auth.default", return_value=(mock_creds, "project")):
+            result = build_credentials(_env_config())
+        assert result is mock_creds
+
+    def test_env_raises_auth_error_on_missing_var(self) -> None:
+        import google.auth.exceptions
+
+        with patch(
+            "google.auth.default",
+            side_effect=google.auth.exceptions.DefaultCredentialsError("no env"),
+        ):
+            with pytest.raises(AuthError, match="GOOGLE_APPLICATION_CREDENTIALS"):
+                build_credentials(_env_config())
+
+
+class TestKeychain:
+    def _make_sa_json(self) -> str:
+        # Fake SA JSON — the from_service_account_info call is patched so the key is never used.
+        # The private_key field intentionally does not contain a valid PEM header/trailer
+        # to avoid triggering the detect-private-key pre-commit hook.
+        # from_service_account_info is patched, so the actual fields don't matter.
+        # Using a minimal dict to avoid triggering credential-detection hooks.
+        return json.dumps({"project_id": "proj", "client_email": "sa@proj.iam.gserviceaccount.com"})
+
+    def test_keychain_not_found_raises_auth_error(self) -> None:
+        with patch(
+            "subprocess.run",
+            side_effect=subprocess.CalledProcessError(44, "security"),
+        ):
+            with pytest.raises(AuthError, match="Keychain item not found"):
+                build_credentials(_keychain_config())
+
+    def test_keychain_security_missing_raises_auth_error(self) -> None:
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            with pytest.raises(AuthError, match="macOS"):
+                build_credentials(_keychain_config())
+
+    def test_keychain_bad_json_raises_auth_error(self) -> None:
+        mock_result = MagicMock()
+        mock_result.stdout = "not-json"
+        with patch("subprocess.run", return_value=mock_result):
+            with pytest.raises(AuthError, match="not valid service account JSON"):
+                build_credentials(_keychain_config())
+
+    def test_keychain_success_returns_credentials(self) -> None:
+        mock_result = MagicMock()
+        mock_result.stdout = self._make_sa_json()
+        mock_creds = MagicMock()
+        with (
+            patch("subprocess.run", return_value=mock_result),
+            patch(
+                "google.oauth2.service_account.Credentials.from_service_account_info",
+                return_value=mock_creds,
+            ),
+        ):
+            result = build_credentials(_keychain_config())
+        assert result is mock_creds
+
+
+class TestUnknownMethod:
+    def test_unknown_method_raises_config_error(self) -> None:
+        config = AuthConfig.model_construct(method="unknown")  # type: ignore[call-arg]
+        with pytest.raises((ConfigError, AuthError)):
+            build_credentials(config)

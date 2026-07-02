@@ -26,11 +26,13 @@ from typing import Optional
 
 import google.auth.credentials
 from google import genai
-from google.genai.types import Chat, GenerateContentConfig
+from google.genai.chats import Chat
+from google.genai.types import GenerateContentConfig, ThinkingConfig
+from google.genai.types import ThinkingLevel as SDKThinkingLevel
 
 from gemini_bridge.config import Config, ThinkingLevel
 
-# Thinking budget values for Gemini 2.x (integer tokens)
+# Thinking budget token counts for Gemini 2.x models
 _THINKING_BUDGET_2X: dict[str, int] = {
     "none": 0,
     "low": 1024,
@@ -38,12 +40,12 @@ _THINKING_BUDGET_2X: dict[str, int] = {
     "high": 32768,
 }
 
-# Thinking level enum values for Gemini 3.x
-_THINKING_LEVEL_3X: dict[str, str] = {
-    "none": "minimal",
-    "low": "low",
-    "medium": "medium",
-    "high": "high",
+# Thinking level enum values for Gemini 3.x models
+_THINKING_LEVEL_3X: dict[str, SDKThinkingLevel] = {
+    "none": SDKThinkingLevel.MINIMAL,
+    "low": SDKThinkingLevel.LOW,
+    "medium": SDKThinkingLevel.MEDIUM,
+    "high": SDKThinkingLevel.HIGH,
 }
 
 
@@ -84,11 +86,11 @@ class GeminiClient:
         model = self._config.model
         if model.startswith("gemini-2."):
             return GenerateContentConfig(
-                thinking_config={"thinking_budget": _THINKING_BUDGET_2X[thinking]}
+                thinking_config=ThinkingConfig(thinking_budget=_THINKING_BUDGET_2X[thinking])
             )
         if model.startswith("gemini-3."):
             return GenerateContentConfig(
-                thinking_config={"thinking_level": _THINKING_LEVEL_3X[thinking]}
+                thinking_config=ThinkingConfig(thinking_level=_THINKING_LEVEL_3X[thinking])
             )
         raise ClientError(
             f"Unrecognized model family: {model!r}. "
