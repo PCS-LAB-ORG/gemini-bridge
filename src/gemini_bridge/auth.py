@@ -24,17 +24,14 @@ Imports:  config.py (AuthConfig, AuthMethod)
 
 import json
 import subprocess
-from typing import TYPE_CHECKING
+from typing import Callable
 
 import google.auth
 import google.auth.credentials
 import google.auth.exceptions
 from google.oauth2 import service_account
 
-from gemini_bridge.config import AuthConfig, AuthMethod, ConfigError
-
-if TYPE_CHECKING:
-    pass
+from gemini_bridge.config import AuthConfig, ConfigError
 
 _VERTEX_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
@@ -97,7 +94,9 @@ def _load_keychain(service: str, account: str) -> google.auth.credentials.Creden
     return service_account.Credentials.from_service_account_info(sa_info, scopes=_VERTEX_SCOPES)
 
 
-_LOADERS: dict[AuthMethod, object] = {
+_CredLoader = Callable[[], google.auth.credentials.Credentials]
+
+_LOADERS: dict[str, _CredLoader] = {
     "adc": _load_adc,
     "env": _load_env,
 }
@@ -111,4 +110,4 @@ def build_credentials(auth_config: AuthConfig) -> google.auth.credentials.Creden
     loader = _LOADERS.get(method)
     if loader is None:
         raise ConfigError(f"Unknown auth method: {method!r}")
-    return loader()  # type: ignore[operator]
+    return loader()
