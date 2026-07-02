@@ -31,7 +31,7 @@ PREV_PROJECT=""
 PREV_MODEL="gemini-2.5-flash"
 PREV_LOCATION="global"
 PREV_THINKING="medium"
-PREV_TRANSCRIPT_DIR="~/session-summaries"
+PREV_TRANSCRIPT_DIR="./session-summaries"
 PREV_KEYCHAIN_SERVICE="gemini-bridge"
 PREV_KEYCHAIN_ACCOUNT="vertex-sa"
 
@@ -49,7 +49,7 @@ try:
         ('PREV_MODEL',            d.get('model', 'gemini-2.5-flash')),
         ('PREV_LOCATION',         d.get('location', 'global')),
         ('PREV_THINKING',         d.get('default_thinking', 'medium')),
-        ('PREV_TRANSCRIPT_DIR',   d.get('transcript_dir', '~/session-summaries')),
+        ('PREV_TRANSCRIPT_DIR',   d.get('transcript_dir', './session-summaries')),
         ('PREV_KEYCHAIN_SERVICE', auth.get('keychain_service', 'gemini-bridge')),
         ('PREV_KEYCHAIN_ACCOUNT', auth.get('keychain_account', 'vertex-sa')),
     ]
