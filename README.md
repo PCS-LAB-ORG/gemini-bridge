@@ -15,7 +15,7 @@ Sessions persist across all tool calls within a Claude Code session. Gemini accu
 
 Five focused tools, each with a distinct system prompt persona. Not a 37-tool Swiss Army knife.
 
-**Quick navigation:** [What it does](#what-it-does) | [Prerequisites](#prerequisites) | [Quick start](#quick-start) | [Configuration](#configuration) | [Auth methods](#auth-methods) | [Logging](#logging) | [Tools](#tools) | [Architecture](#architecture) | [Project structure](#project-structure) | [Full documentation](#full-documentation)
+**Quick navigation:** [What it does](#what-it-does) | [Prerequisites](#prerequisites) | [Quick start](#quick-start) | [Configuration](#configuration) | [Auth methods](#auth-methods) | [Thinking levels](#thinking-levels) | [Roadmap](#roadmap) | [Full documentation](#full-documentation)
 
 ---
 
@@ -35,7 +35,7 @@ All tools share optional `thinking` (`none`/`low`/`medium`/`high`) and `session_
 
 **Transcript logging:** Every exchange appended to `{transcript_dir}/YYYYMMDD-HHMM-gemini-transcript.md`.
 
-**Server logging:** Structured logs at `~/.config/gemini-bridge/logs/YYYYMMDD-gemini-bridge.log`.
+**Server logging:** Structured logs at `~/.config/gemini-bridge/logs/YYYYMMDD-gemini-bridge.log`. See [docs/logging.md](docs/logging.md).
 
 ---
 
@@ -129,38 +129,9 @@ SA JSON loaded to memory at startup; zero disk artifact after store. `setup.sh` 
 
 ---
 
-## Logging
+## Thinking levels
 
-The server writes structured logs to a daily rotating file — four days retained, current day always active.
-
-**Log file location:**
-```
-~/.config/gemini-bridge/logs/YYYYMMDD-gemini-bridge.log
-```
-
-**Tail live:**
-```bash
-tail -f ~/.config/gemini-bridge/logs/$(ls -t ~/.config/gemini-bridge/logs/*.log | head -1 | xargs basename)
-```
-
-**Log levels** (set via `GEMINI_BRIDGE_LOG_LEVEL` env var, default `INFO`):
-
-| Level | What you see |
-|---|---|
-| `INFO` | Startup (auth method, model, transcript path) |
-| `WARNING` | Transcript write failures, empty Gemini responses |
-| `ERROR` | Auth failures, inference failures — with context |
-| `DEBUG` | Per-call tool name, session, thinking level, response length |
-
-Set `GEMINI_BRIDGE_LOG_LEVEL=DEBUG` before starting Claude Code for full call-level detail.
-
----
-
-## Tools
-
-See [docs/tools.md](docs/tools.md) for system prompts, parameter docs, and example prompts for each tool.
-
-**Thinking levels** — Claude picks per call based on complexity:
+Claude picks per call based on question complexity. See [docs/tools.md](docs/tools.md) for full tool documentation.
 
 | Level | Gemini 2.x (`thinking_budget`) | Gemini 3.x (`thinking_level`) |
 |---|---|---|
@@ -171,74 +142,14 @@ See [docs/tools.md](docs/tools.md) for system prompts, parameter docs, and examp
 
 ---
 
-## Architecture
-
-```mermaid
-flowchart LR
-    CC[Claude Code] -->|MCP tool call| S[server.py]
-    S -->|registered tool fn| T[tools/*.py]
-    T -->|call_gemini| C[client.py]
-    C -->|send_message| V[Vertex AI / Gemini]
-    V -->|response| C
-    T -->|append| TX[transcript.py]
-    TX --> F[YYYYMMDD-HHMM-gemini-transcript.md]
-    T -->|ToolResult str| CC
-    M[__main__.py] -->|startup| L[logs/YYYYMMDD-gemini-bridge.log]
-```
-
-**Startup sequence:** `__main__.py` configures logging → loads config → builds credentials → instantiates `GeminiClient` + `TranscriptWriter` → `build_server()` registers all 5 tools → `server.run()`.
-
-Sessions are keyed by `tool_name:session_name`. Each tool maintains its own chat history so system prompt personas stay locked for the session.
-
----
-
-## Project structure
-
-```
-gemini-bridge/
-├── pyproject.toml
-├── setup.sh                    # interactive configuration wizard (re-run safe)
-├── session-summaries/          # Markdown transcripts, one file per Claude Code session
-├── docs/
-│   ├── README.md               # documentation index
-│   ├── architecture.md         # component diagram, session lifecycle, SOLID mapping
-│   ├── auth.md                 # all auth methods, troubleshooting, ADC vs gcloud auth
-│   ├── configuration.md        # full config.json field reference
-│   ├── development.md          # dev setup, tests, logging, adding a new tool
-│   ├── logging.md              # log file location, levels, tail command, rotation
-│   ├── roadmap.md              # v1–v5 with rationale and shipped status
-│   ├── tools.md                # system prompts, parameters, examples
-│   └── transcripts.md          # transcript format, session boundaries
-└── src/
-    └── gemini_bridge/
-        ├── __main__.py         # entry: python -m gemini_bridge (configures logging)
-        ├── server.py           # MCP server construction, tool registration
-        ├── client.py           # Gemini session manager, ask() interface
-        ├── config.py           # config.json loading and validation
-        ├── auth.py             # credential loading (ADC, env, Keychain)
-        ├── transcript.py       # session transcript writing
-        └── tools/
-            ├── base.py         # ToolResult type, call_gemini() helper
-            ├── ask.py
-            ├── brainstorm.py
-            ├── review.py
-            ├── debug.py
-            └── architect.py
-```
-
----
-
 ## Roadmap
 
-| Version | Status | Features |
+| Release | Status | Highlights |
 |---|---|---|
-| v1.0 | ✓ Shipped | 5 tools, ADC auth, single persistent session, transcript logging, full docs |
-| v1.1 | ✓ Shipped | Env-file SA auth fallback (`GOOGLE_APPLICATION_CREDENTIALS`) |
-| v2.5 | ✓ Shipped | Apple Keychain auth (macOS) — SA JSON in Keychain, zero disk artifact |
-| v2.0 | Roadmap | Named sessions (`gemini_new_session`, `session_name` routing) |
-| v3.0 | Roadmap | `gemini_set_transcript_dir` — per-project transcript routing without config edit |
+| 26.7.1 | ✓ Shipped | 5 tools · ADC, env + Keychain auth · persistent sessions · transcript logging · structured logging · full docs |
+| 26.7.2 | Planned | Named sessions · per-project transcript routing · Google AI Studio API key auth |
 
-See [docs/roadmap.md](docs/roadmap.md) for detailed rationale per phase.
+See [docs/roadmap.md](docs/roadmap.md) for full phase breakdown and rationale.
 
 ---
 
