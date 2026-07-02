@@ -65,7 +65,7 @@ pip install -e .
 bash setup.sh
 
 # 3. Register with Claude Code
-claude mcp add -s user gemini-bridge python -m gemini_bridge
+claude mcp add -s user gemini-bridge -- python3 -m gemini_bridge
 
 # 4. Verify
 claude mcp list
@@ -136,7 +136,7 @@ flowchart LR
 | Field | Default | Description |
 |---|---|---|
 | `project` | — | GCP project ID (required) |
-| `location` | `us-central1` | Vertex AI region |
+| `location` | `global` | Vertex AI location; `global` works for all models; specific regions only for gemini-2.x |
 | `model` | `gemini-2.5-flash` | Gemini model ID |
 | `default_thinking` | `medium` | Thinking level when omitted per call |
 | `transcript_dir` | `~/session-summaries` | Transcript directory |

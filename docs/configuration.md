@@ -9,7 +9,7 @@ Created by `bash setup.sh`. Safe to edit by hand.
 ```json
 {
   "project": "my-gcp-project",
-  "location": "us-central1",
+  "location": "global",
   "model": "gemini-2.5-flash",
   "default_thinking": "medium",
   "transcript_dir": "~/session-summaries",
@@ -34,11 +34,18 @@ granted to your ADC credentials or service account.
 ### `location`
 
 **Type:** string
-**Default:** `"us-central1"`
-**Example:** `"us-east4"`
+**Default:** `"global"`
+**Example:** `"us-central1"`
 
-Vertex AI region. Must support the Gemini model you're using. `us-central1` has the
-widest model availability.
+Vertex AI location. `"global"` works for all models and is the recommended default.
+
+**Gemini 3.x models** (`gemini-3.*`) are **global-only** — they do not support specific
+regional endpoints. If you set a region with a 3.x model, the server will fail to start
+with a validation error.
+
+**Gemini 2.5 models** (`gemini-2.5-flash`, `gemini-2.5-pro`) support `"global"` plus
+specific regions: `us-central1`, `us-east4`, `europe-west1`, `asia-northeast1`, and
+others. Use a specific region if you have data-residency requirements.
 
 ---
 
