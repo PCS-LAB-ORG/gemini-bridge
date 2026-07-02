@@ -18,7 +18,7 @@ def test_load_config_minimal() -> None:
         _write_config(cfg_path, {"project": "my-project"})
         cfg = load_config(cfg_path)
     assert cfg.project == "my-project"
-    assert cfg.location == "us-central1"
+    assert cfg.location == "global"
     assert cfg.model == "gemini-2.5-flash"
     assert cfg.default_thinking == "medium"
     assert cfg.auth.method == "adc"
@@ -77,6 +77,22 @@ def test_load_config_bad_model_family() -> None:
 def test_config_model_gemini3_accepted() -> None:
     cfg = Config(project="p", model="gemini-3.5-flash")
     assert cfg.model == "gemini-3.5-flash"
+    assert cfg.location == "global"
+
+
+def test_config_gemini3_with_region_rejected() -> None:
+    with pytest.raises(Exception, match="only supports location"):
+        Config(project="p", model="gemini-3.5-flash", location="us-central1")
+
+
+def test_config_gemini2_with_region_accepted() -> None:
+    cfg = Config(project="p", model="gemini-2.5-flash", location="us-central1")
+    assert cfg.location == "us-central1"
+
+
+def test_config_gemini2_global_accepted() -> None:
+    cfg = Config(project="p", model="gemini-2.5-flash", location="global")
+    assert cfg.location == "global"
 
 
 def test_config_keychain_auth_defaults() -> None:

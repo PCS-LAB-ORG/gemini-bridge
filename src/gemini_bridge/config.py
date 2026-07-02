@@ -25,7 +25,7 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 CONFIG_PATH: Path = Path.home() / ".config" / "gemini-bridge" / "config.json"
 
@@ -45,7 +45,7 @@ class AuthConfig(BaseModel):
 
 class Config(BaseModel):
     project: str
-    location: str = "us-central1"
+    location: str = "global"
     model: str = "gemini-2.5-flash"
     default_thinking: ThinkingLevel = "medium"
     transcript_dir: str = "~/session-summaries"
@@ -59,6 +59,15 @@ class Config(BaseModel):
                 f"Unrecognized model family: {v!r}. Expected 'gemini-2.*' or 'gemini-3.*'."
             )
         return v
+
+    @model_validator(mode="after")
+    def location_compatible_with_model(self) -> "Config":
+        if self.model.startswith("gemini-3.") and self.location != "global":
+            raise ValueError(
+                f"Model {self.model!r} only supports location='global' on Vertex AI. "
+                "Remove the location field or set it to 'global'."
+            )
+        return self
 
 
 def load_config(path: Path = CONFIG_PATH) -> Config:

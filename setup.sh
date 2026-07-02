@@ -50,16 +50,13 @@ DEFAULT_PROJECT=$(gcloud config get-value project 2>/dev/null || true)
 PROJECT=$(ask "GCP project" "$DEFAULT_PROJECT")
 [[ -z "$PROJECT" ]] && error "GCP project is required."
 
-# --- location ---
-LOCATION=$(ask "Location" "us-central1")
-
-# --- model ---
+# --- model (before location — location options depend on model family) ---
 echo
 echo "Model:"
 echo "  1) gemini-2.5-flash        — fast, cheap (recommended)"
 echo "  2) gemini-2.5-pro          — more capable"
-echo "  3) gemini-3.5-flash        — newest Flash"
-echo "  4) gemini-3.1-pro-preview  — newest Pro (preview)"
+echo "  3) gemini-3.5-flash        — newest Flash (global endpoint only)"
+echo "  4) gemini-3.1-pro-preview  — newest Pro, preview (global endpoint only)"
 MODEL_CHOICE=$(ask "Choice" "1")
 case "$MODEL_CHOICE" in
     1) MODEL="gemini-2.5-flash" ;;
@@ -68,6 +65,21 @@ case "$MODEL_CHOICE" in
     4) MODEL="gemini-3.1-pro-preview" ;;
     *) error "Invalid choice: $MODEL_CHOICE" ;;
 esac
+
+# --- location (gemini-3.x is global-only; gemini-2.x allows regions) ---
+echo
+if [[ "$MODEL" == gemini-3.* ]]; then
+    LOCATION="global"
+    info "Location: global (required for $MODEL)"
+else
+    echo "Location (gemini-2.x supports 'global' or a specific region):"
+    echo "  global — recommended; routes to lowest-latency region automatically"
+    echo "  us-central1, us-east4, europe-west1, asia-northeast1, etc."
+    LOCATION=$(ask "Location" "global")
+    if [[ -z "$LOCATION" ]]; then
+        error "Location is required."
+    fi
+fi
 
 # --- thinking level ---
 echo
@@ -106,7 +118,7 @@ echo
 info "=== Next steps ==="
 echo
 echo "  pip install -e ."
-echo "  claude mcp add -s user gemini-bridge python -m gemini_bridge"
+echo "  claude mcp add -s user gemini-bridge -- python3 -m gemini_bridge"
 echo "  claude mcp list"
 echo
 info "Done. Restart Claude Code to activate gemini-bridge."
