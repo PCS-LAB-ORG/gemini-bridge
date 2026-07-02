@@ -1,0 +1,66 @@
+"""
+gemini_bridge/tools/architect.py
+---------------------------------
+MCP tool: gemini_architect — system design and tradeoff analysis.
+
+Responsibilities:
+  - Register the gemini_architect MCP tool with the server
+  - Accept system description + optional focused question and thinking level
+  - Return Gemini's opinionated architecture guidance with explicit tradeoffs
+
+Design notes:
+  - Single Responsibility: tool registration + architect persona only
+  - Open/Closed: system prompt changes do not affect other tools
+  - System prompt: opinionated when a clearly better path exists; names tradeoffs explicitly
+
+Used by:  tools/__init__.py -> register_architect(), server.py (via tools/__init__)
+Imports:  tools/base.py (call_gemini), client.py (GeminiClient), transcript.py (TranscriptWriter)
+"""
+
+from typing import Annotated, Optional
+
+from mcp.server.fastmcp import FastMCP
+
+from gemini_bridge.client import GeminiClient
+from gemini_bridge.config import ThinkingLevel
+from gemini_bridge.tools.base import ToolResult, call_gemini
+from gemini_bridge.transcript import TranscriptWriter
+
+_SYSTEM_PROMPT = (
+    "You are a software architecture advisor working alongside Claude, another AI. "
+    "Evaluate system designs, suggest patterns, identify scalability and maintainability concerns. "
+    "Be opinionated when a clearly better path exists. "
+    "Name tradeoffs explicitly when the choice is genuinely context-dependent."
+)
+
+_TOOL_NAME = "gemini_architect"
+
+
+def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -> None:
+    """Register gemini_architect with the MCP server."""
+
+    @mcp.tool()
+    def gemini_architect(
+        description: Annotated[str, "The system design, architecture, or approach to evaluate"],
+        question: Annotated[
+            str,
+            "Optional specific architecture question or concern to focus on.",
+        ] = "",
+        thinking: Annotated[
+            Optional[ThinkingLevel],
+            "Reasoning depth: none, low, medium, high. Defaults to config setting.",
+        ] = None,
+        session_name: Annotated[str, "Session name for conversation continuity."] = "default",
+    ) -> ToolResult:
+        """Ask Gemini to evaluate a system design or architecture. Gemini will be opinionated
+        where warranted and name tradeoffs explicitly when choices are context-dependent."""
+        full_prompt = description if not question else f"{description}\n\nQuestion: {question}"
+        return call_gemini(
+            client=client,
+            transcript=transcript,
+            tool_name=_TOOL_NAME,
+            session_name=session_name,
+            system_instruction=_SYSTEM_PROMPT,
+            prompt=full_prompt,
+            thinking=thinking,
+        )
