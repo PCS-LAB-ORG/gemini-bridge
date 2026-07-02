@@ -4,17 +4,22 @@ gemini_bridge/__main__.py
 Entry point: python -m gemini_bridge
 
 Responsibilities:
-  - Configure structured logging to stderr before any other import runs
+  - Configure structured logging (file + stderr) before any other import runs
   - Load config from ~/.config/gemini-bridge/config.json
   - Build credentials via auth.build_credentials()
   - Instantiate GeminiClient and TranscriptWriter
   - Build and run the MCP server
-  - Report startup errors to stderr with actionable messages
+  - Report startup errors with actionable messages
 
 Design notes:
   - Single Responsibility: startup orchestration only; all logic lives in imported modules
   - Dependency Inversion: passes ready-made Config, Credentials, Client, Transcript to server
   - Logging is configured first so all downstream modules inherit the handler/formatter
+
+Log files:
+  ~/.config/gemini-bridge/logs/YYYYMMDD-gemini-bridge.log
+  Daily files; 4 most recent kept; multiple sessions same day append to same file.
+  Tail: tail -f ~/.config/gemini-bridge/logs/$(ls -t ~/.config/gemini-bridge/logs/*.log | head -1 | xargs basename)
 
 Environment variables:
   GEMINI_BRIDGE_LOG_LEVEL  — DEBUG | INFO | WARNING | ERROR (default: INFO)
@@ -30,35 +35,58 @@ import logging
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
+
+_LOG_DIR = Path.home() / ".config" / "gemini-bridge" / "logs"
+_MAX_LOG_FILES = 4
 
 
-def _configure_logging() -> None:
-    """Set up stderr logging before any module that calls getLogger() is imported."""
+def _setup_log_file(startup_time: datetime) -> logging.FileHandler:
+    """Create today's log file, prune files beyond _MAX_LOG_FILES."""
+    _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_file = _LOG_DIR / f"{startup_time.strftime('%Y%m%d')}-gemini-bridge.log"
+    # Prune oldest files, keeping _MAX_LOG_FILES most recent
+    existing = sorted(_LOG_DIR.glob("*-gemini-bridge.log"), reverse=True)
+    for old in existing[_MAX_LOG_FILES:]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+    return logging.FileHandler(log_file, mode="a", encoding="utf-8")
+
+
+def _configure_logging(startup_time: datetime) -> None:
+    """Set up file + stderr logging before any module that calls getLogger() is imported."""
     raw_level = os.environ.get("GEMINI_BRIDGE_LOG_LEVEL", "INFO").upper()
     level = getattr(logging, raw_level, logging.INFO)
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(
-        logging.Formatter(
-            fmt="[gemini-bridge] %(asctime)s %(levelname)-8s %(name)s: %(message)s",
-            datefmt="%H:%M:%S",
-        )
+    formatter = logging.Formatter(
+        fmt="[gemini-bridge] %(asctime)s %(levelname)-8s %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
     )
     root = logging.getLogger("gemini_bridge")
     root.setLevel(level)
-    root.addHandler(handler)
-    # Suppress chatty third-party loggers unless we're in DEBUG mode
+    # File handler — primary; visible via tail
+    file_handler = _setup_log_file(startup_time)
+    file_handler.setFormatter(formatter)
+    root.addHandler(file_handler)
+    # Stderr handler — useful when running server manually; swallowed by Claude Code
+    stderr_handler = logging.StreamHandler(sys.stderr)
+    stderr_handler.setFormatter(formatter)
+    root.addHandler(stderr_handler)
+    # Suppress chatty third-party loggers unless in DEBUG mode
     if level > logging.DEBUG:
         logging.getLogger("google").setLevel(logging.WARNING)
         logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
-_configure_logging()
+_startup_time = datetime.now()
+_configure_logging(_startup_time)
 
 _log = logging.getLogger(__name__)
 
 
 def main() -> None:
-    startup_time = datetime.now()
+    startup_time = _startup_time
 
     from gemini_bridge.auth import AuthError, build_credentials
     from gemini_bridge.client import GeminiClient
