@@ -70,8 +70,9 @@ def _load_env(auth_config: AuthConfig) -> google.auth.credentials.Credentials:
 
 def _load_keychain(auth_config: AuthConfig) -> google.auth.credentials.Credentials:
     """Load service account JSON from Apple Keychain (macOS only)."""
-    service = auth_config.keychain_service
-    account = auth_config.keychain_account
+    # model_validator guarantees non-None when method="keychain"; or-defaults are a safety net
+    service = auth_config.keychain_service or "gemini-bridge"
+    account = auth_config.keychain_account or "vertex-sa"
     try:
         result = subprocess.run(
             ["security", "find-generic-password", "-s", service, "-a", account, "-w"],
