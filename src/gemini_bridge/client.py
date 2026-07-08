@@ -25,6 +25,7 @@ Imports:  config.py (Config, ThinkingLevel), auth.py (build_credentials)
 import logging
 import random
 import time
+from collections import OrderedDict
 from typing import Optional
 
 _log = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ _THINKING_LEVEL_3X: dict[str, SDKThinkingLevel] = {
 }
 
 
+_MAX_SESSIONS = 50  # LRU cap; oldest session evicted when exceeded
 _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 1.0  # seconds; doubles each attempt plus jitter
 
@@ -86,23 +88,26 @@ class GeminiClient:
                 location=config.location,
                 credentials=credentials,
             )
-        self._sessions: dict[str, Chat] = {}
+        self._sessions: OrderedDict[str, Chat] = OrderedDict()
 
     def get_or_create_session(
         self,
         name: str = "default",
         system_instruction: Optional[str] = None,
     ) -> Chat:
-        """Return existing chat session or create a new one."""
-        if name not in self._sessions:
-            cfg: Optional[GenerateContentConfig] = None
-            if system_instruction:
-                cfg = GenerateContentConfig(system_instruction=system_instruction)
-            self._sessions[name] = self._raw_client.chats.create(
-                model=self._config.model,
-                config=cfg,
-            )
-        return self._sessions[name]
+        """Return existing chat session or create a new one (LRU-capped at _MAX_SESSIONS)."""
+        if name in self._sessions:
+            self._sessions.move_to_end(name)
+            return self._sessions[name]
+        cfg: Optional[GenerateContentConfig] = None
+        if system_instruction:
+            cfg = GenerateContentConfig(system_instruction=system_instruction)
+        session = self._raw_client.chats.create(model=self._config.model, config=cfg)
+        self._sessions[name] = session
+        if len(self._sessions) > _MAX_SESSIONS:
+            evicted, _ = self._sessions.popitem(last=False)
+            _log.debug("session cache evicted (LRU): %s", evicted)
+        return session
 
     @property
     def default_thinking(self) -> ThinkingLevel:
