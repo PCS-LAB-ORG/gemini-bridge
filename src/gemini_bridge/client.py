@@ -26,7 +26,7 @@ import logging
 import random
 import time
 from collections import OrderedDict
-from typing import Optional
+from typing import Any, Optional
 
 _log = logging.getLogger(__name__)
 
@@ -39,7 +39,9 @@ from google.genai.types import ThinkingLevel as SDKThinkingLevel
 from gemini_bridge.config import Config, ModelFamily, ThinkingLevel
 
 # Default model used when a tool call does not specify one.
-DEFAULT_MODEL = "gemini-2.5-flash"
+# gemini-3.5-flash is GA on both the Developer API and Vertex AI — near-Pro quality at
+# Flash cost/speed. Falls back to the rock-stable gemini-2.5-flash on overload.
+DEFAULT_MODEL = "gemini-3.5-flash"
 # Stable fallback model used when the requested model returns a terminal 503/429.
 FALLBACK_MODEL = "gemini-2.5-flash"
 
@@ -74,14 +76,16 @@ def _is_retryable(exc: Exception) -> bool:
 def _warn_model_backend_mismatch(model: str, is_vertex: bool) -> None:
     """Log a warning when the model name looks mismatched with the active backend.
 
-    Developer API (api_key): uses unversioned aliases like 'gemini-2.5-flash'.
-    Vertex AI: uses versioned IDs like 'gemini-2.0-flash-001' or stable aliases;
-               gemini-3.x previews may not be available and will 404.
+    Developer API (api_key): unversioned names and '-latest' aliases. Preview models
+               (e.g. 'gemini-3.1-pro-preview') may not be available and can 404.
+    Vertex AI: versioned IDs or stable names; '-latest' aliases are a Developer-API
+               convention and will 404 on Vertex.
     """
-    if not is_vertex and model.startswith("gemini-3."):
+    if not is_vertex and "preview" in model:
         _log.warning(
-            "model %r is a Gemini 3.x preview — availability via Google AI Studio API "
-            "keys varies. If you get 404/503, try 'gemini-2.5-flash' instead.",
+            "model %r is a preview model — availability via Google AI Studio API keys "
+            "varies. If you get 404/503, try a GA model like 'gemini-3.5-flash' or "
+            "'gemini-2.5-flash'.",
             model,
         )
     elif is_vertex and "-latest" in model:
@@ -173,6 +177,24 @@ class GeminiClient:
     @property
     def default_thinking(self) -> ThinkingLevel:
         return self._config.default_thinking
+
+    @property
+    def auth_method(self) -> str:
+        """The configured auth method (e.g. 'api_key', 'adc'). Public accessor so tools
+        need not reach into ._config; models.backend_for() maps it to a backend."""
+        return self._config.auth.method
+
+    def list_models(self) -> list[Any]:
+        """Return the backend's model catalog (raw google-genai Model objects).
+
+        Thin pass-through so tools never touch ._raw_client. Raises ClientError on failure
+        so callers can degrade gracefully (e.g. fall back to a static shortlist).
+        """
+        try:
+            return list(self._raw_client.models.list())
+        except Exception as exc:
+            _log.error("models.list failed: %s", exc)
+            raise ClientError(f"Failed to list models: {exc}") from exc
 
     def _build_generation_config(
         self,

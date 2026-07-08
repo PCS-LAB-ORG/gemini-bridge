@@ -42,6 +42,18 @@ writes `keychain_service`/`keychain_account` fields to config.json.
 **macOS only:** The `security` CLI is macOS-specific. Linux equivalents (secret-tool, pass)
 are out of scope.
 
+### Per-Call Model Selection + Discoverability ✓ Shipped
+
+Per-call `model=` parameter on all five inference tools; `-latest` aliases (Developer API);
+transparent fallback to `gemini-2.5-flash` on 503/429 with a disclosure notice; default model
+raised to `gemini-3.5-flash`.
+
+Model options are now **discoverable** and **backend-aware**: each tool's `model` parameter
+description lists the models valid for the active backend, and a new `gemini_list_models` tool
+returns the live, chat-only catalog (degrading to a curated static shortlist if the live list is
+unavailable). Single source of truth in `models.py`. See
+[configuration.md](configuration.md#choosing-a-model) and [tools.md](tools.md#gemini_list_models).
+
 ---
 
 ## 26.7.2 — Planned

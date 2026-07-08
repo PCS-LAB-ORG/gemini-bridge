@@ -285,4 +285,13 @@ else
 fi
 echo "  claude mcp list"
 echo
+info "Model selection is per-call (no model in config):"
+echo "  • Default model: gemini-3.5-flash (falls back to gemini-2.5-flash on overload)"
+echo "  • Pass model='<id>' to any tool to override; call gemini_list_models to see valid ids"
+if [[ "$AUTH_METHOD" == "api_key" ]]; then
+    echo "  • Developer API supports '-latest' aliases (e.g. gemini-flash-latest)"
+else
+    echo "  • Vertex AI uses versioned names; '-latest' aliases are not available"
+fi
+echo
 info "Done. Restart Claude Code to activate gemini-bridge."

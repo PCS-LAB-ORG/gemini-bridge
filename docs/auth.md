@@ -125,13 +125,12 @@ claude mcp add -s user gemini-bridge -e GEMINI_API_KEY=AIza... -- python3 -m gem
 **Config written by setup.sh:**
 ```json
 {
+  "default_thinking": "medium",
+  "transcript_dir": "./session-summaries",
   "auth": {
     "method": "api_key",
     "api_key_env": "GEMINI_API_KEY"
-  },
-  "model": "gemini-2.5-flash",
-  "default_thinking": "medium",
-  "transcript_dir": "./session-summaries"
+  }
 }
 ```
 

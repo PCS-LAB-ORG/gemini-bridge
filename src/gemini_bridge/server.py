@@ -6,7 +6,7 @@ MCP server construction and tool registration.
 Responsibilities:
   - Build the FastMCP server instance
   - Accept pre-constructed GeminiClient and TranscriptWriter (injected by __main__.py)
-  - Register all 5 tools by calling each tool module's register() function
+  - Register all 6 tools by calling each tool module's register() function
   - Return the configured server instance for running
 
 Design notes:
@@ -29,6 +29,7 @@ from gemini_bridge.tools import (
     register_ask,
     register_brainstorm,
     register_debug,
+    register_list_models,
     register_review,
 )
 from gemini_bridge.transcript import TranscriptWriter
@@ -44,4 +45,5 @@ def build_server(client: GeminiClient, transcript: TranscriptWriter) -> FastMCP:
     register_review(mcp, client, transcript)
     register_debug(mcp, client, transcript)
     register_architect(mcp, client, transcript)
+    register_list_models(mcp, client, transcript)
     return mcp

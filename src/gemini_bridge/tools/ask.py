@@ -21,10 +21,11 @@ Imports:  tools/base.py (call_gemini, ThinkingParam), client.py (GeminiClient),
 from typing import Annotated, Optional
 
 from mcp.server.fastmcp import FastMCP
+from pydantic import Field
 
 from gemini_bridge.client import GeminiClient
 from gemini_bridge.config import ThinkingLevel
-from gemini_bridge.tools.base import ToolResult, call_gemini
+from gemini_bridge.tools.base import ToolResult, call_gemini, model_param_hint
 from gemini_bridge.transcript import TranscriptWriter
 
 _SYSTEM_PROMPT = (
@@ -37,6 +38,7 @@ _TOOL_NAME = "gemini_ask"
 
 def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -> None:
     """Register gemini_ask with the MCP server."""
+    model_hint = model_param_hint(client)
 
     @mcp.tool()
     def gemini_ask(
@@ -49,10 +51,7 @@ def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -
             str,
             "Session name for conversation continuity (v1: always 'default').",
         ] = "default",
-        model: Annotated[
-            Optional[str],
-            "Gemini model, e.g. 'gemini-2.5-flash'. Omit to use server default.",
-        ] = None,
+        model: Annotated[Optional[str], Field(description=model_hint)] = None,
     ) -> ToolResult:
         """Ask Gemini a general question. Use when no other specialized tool fits."""
         return call_gemini(

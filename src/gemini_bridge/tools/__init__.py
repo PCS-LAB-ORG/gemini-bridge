@@ -17,6 +17,7 @@ from gemini_bridge.tools.architect import register as register_architect
 from gemini_bridge.tools.ask import register as register_ask
 from gemini_bridge.tools.brainstorm import register as register_brainstorm
 from gemini_bridge.tools.debug import register as register_debug
+from gemini_bridge.tools.list_models import register as register_list_models
 from gemini_bridge.tools.review import register as register_review
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "register_review",
     "register_debug",
     "register_architect",
+    "register_list_models",
 ]
