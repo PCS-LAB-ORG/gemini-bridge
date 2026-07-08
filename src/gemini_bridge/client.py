@@ -23,6 +23,8 @@ Imports:  config.py (Config, ThinkingLevel), auth.py (build_credentials)
 """
 
 import logging
+import random
+import time
 from typing import Optional
 
 _log = logging.getLogger(__name__)
@@ -50,6 +52,15 @@ _THINKING_LEVEL_3X: dict[str, SDKThinkingLevel] = {
     "medium": SDKThinkingLevel.MEDIUM,
     "high": SDKThinkingLevel.HIGH,
 }
+
+
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 1.0  # seconds; doubles each attempt plus jitter
+
+
+def _is_retryable(exc: Exception) -> bool:
+    msg = str(exc).upper()
+    return any(token in msg for token in ("503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED"))
 
 
 class ClientError(Exception):
@@ -130,11 +141,26 @@ class GeminiClient:
         effective_thinking: ThinkingLevel = thinking or self._config.default_thinking
         gen_config = self._build_generation_config(effective_thinking, system_instruction)
         _log.debug("ask: thinking=%s prompt_len=%d", effective_thinking, len(prompt))
-        try:
-            response = session.send_message(prompt, config=gen_config)
-        except Exception as exc:
-            _log.error("inference failed: %s", exc)
-            raise ClientError(f"Gemini inference failed: {exc}") from exc
+        for attempt in range(1, _MAX_RETRIES + 2):
+            try:
+                response = session.send_message(prompt, config=gen_config)
+                break
+            except Exception as exc:
+                is_last = attempt > _MAX_RETRIES
+                if not is_last and _is_retryable(exc):
+                    delay = _RETRY_BASE_DELAY * (2 ** (attempt - 1)) + random.uniform(0, 0.5)
+                    _log.warning(
+                        "inference attempt %d/%d failed (retryable) — retrying in %.1fs: %s",
+                        attempt,
+                        _MAX_RETRIES + 1,
+                        delay,
+                        exc,
+                    )
+                    time.sleep(delay)
+                else:
+                    suffix = f" after {attempt} attempt(s)" if attempt > 1 else ""
+                    _log.error("inference failed%s: %s", suffix, exc)
+                    raise ClientError(f"Gemini inference failed{suffix}: {exc}") from exc
         if not response.text:
             _log.warning("Gemini returned an empty response")
             raise ClientError("Gemini returned an empty response.")
