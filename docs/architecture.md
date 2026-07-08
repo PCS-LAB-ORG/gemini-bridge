@@ -35,7 +35,7 @@ so the system prompt persona is locked for the session.
 ## Transcript Lifecycle
 
 - **File created:** at server startup, named with the startup timestamp
-- **File path:** `{transcript_dir}/YYYYMMDD-HHMM-gemini-transcript.md`
+- **File path:** `{transcript_dir}/YYYYMMDD-HHMM-gemini-bridge-transcript.md`
 - **Appended:** after every successful Gemini response
 - **Never truncated:** append-only; write errors go to stderr, never break tool calls
 - **Per session:** one file per Claude Code process lifetime

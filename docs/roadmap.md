@@ -11,7 +11,7 @@
 - `gemini_ask`, `gemini_brainstorm`, `gemini_review`, `gemini_debug`, `gemini_architect`
 - ADC (Application Default Credentials) — one-time setup, SDK auto-refreshes
 - One default Gemini chat session per server process lifetime
-- Transcript logging to `YYYYMMDD-HHMM-gemini-transcript.md`
+- Transcript logging to `YYYYMMDD-HHMM-gemini-bridge-transcript.md`
 - Interactive `setup.sh` wizard
 - Full `docs/` directory + README.md
 

@@ -35,7 +35,7 @@ class TranscriptWriter:
     def __init__(self, config_transcript_dir: str, startup_time: datetime) -> None:
         transcript_dir = Path(config_transcript_dir).expanduser().resolve()
         transcript_dir.mkdir(parents=True, exist_ok=True)
-        filename = startup_time.strftime("%Y%m%d-%H%M-gemini-transcript.md")
+        filename = startup_time.strftime("%Y%m%d-%H%M-gemini-bridge-transcript.md")
         self._path = transcript_dir / filename
 
     @property

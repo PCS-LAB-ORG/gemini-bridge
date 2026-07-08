@@ -2,7 +2,7 @@
 
 ## File format
 
-Each file is named `YYYYMMDD-HHMM-gemini-transcript.md` using the **server startup timestamp**.
+Each file is named `YYYYMMDD-HHMM-gemini-bridge-transcript.md` using the **server startup timestamp**.
 All tool calls within one Claude Code session (one server process) append to the same file.
 
 **Per-exchange format:**

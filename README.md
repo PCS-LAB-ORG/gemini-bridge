@@ -33,7 +33,7 @@ All tools share optional `thinking` (`none`/`low`/`medium`/`high`) and `session_
 
 **Session model:** One Gemini chat session per tool name per Claude Code process. Context accumulates naturally within a session — later calls can reference earlier ones.
 
-**Transcript logging:** Every exchange appended to `{transcript_dir}/YYYYMMDD-HHMM-gemini-transcript.md`.
+**Transcript logging:** Every exchange appended to `{transcript_dir}/YYYYMMDD-HHMM-gemini-bridge-transcript.md`.
 
 **Server logging:** Structured logs at `~/.config/gemini-bridge/logs/YYYYMMDD-gemini-bridge.log`. See [docs/logging.md](docs/logging.md).
 
@@ -73,7 +73,7 @@ Restart Claude Code after step 3. On next start you'll see startup entries in th
 
 ```
 [gemini-bridge] 17:50:10 INFO  gemini_bridge.__main__: starting — auth=keychain model=gemini-3.1-pro-preview location=global
-[gemini-bridge] 17:50:10 INFO  gemini_bridge.__main__: transcript → ~/session-summaries/20260702-1750-gemini-transcript.md
+[gemini-bridge] 17:50:10 INFO  gemini_bridge.__main__: transcript → ~/session-summaries/20260702-1750-gemini-bridge-transcript.md
 ```
 
 ---
