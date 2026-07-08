@@ -84,7 +84,7 @@ it judges a different level is appropriate.
 **Default:** `"./session-summaries"`
 
 Directory where transcript files are written. Created if it doesn't exist. Transcript files
-are named `YYYYMMDD-HHMM-gemini-transcript.md` using the server startup time.
+are named `YYYYMMDD-HHMM-gemini-bridge-transcript.md` using the server startup time.
 
 The default `./session-summaries` resolves relative to the project root where Claude Code
 was launched — transcripts land in `your-project/session-summaries/` automatically, one
