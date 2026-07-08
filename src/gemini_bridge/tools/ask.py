@@ -49,6 +49,10 @@ def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -
             str,
             "Session name for conversation continuity (v1: always 'default').",
         ] = "default",
+        model: Annotated[
+            Optional[str],
+            "Gemini model, e.g. 'gemini-2.5-flash'. Omit to use server default.",
+        ] = None,
     ) -> ToolResult:
         """Ask Gemini a general question. Use when no other specialized tool fits."""
         return call_gemini(
@@ -59,4 +63,5 @@ def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -
             system_instruction=_SYSTEM_PROMPT,
             prompt=prompt,
             thinking=thinking,
+            model=model,
         )

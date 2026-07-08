@@ -44,16 +44,26 @@ def call_gemini(
     system_instruction: str,
     prompt: str,
     thinking: ThinkingParam,
+    model: Optional[str] = None,
 ) -> ToolResult:
     """Get a session, call ask(), log to transcript, return response or error string."""
     session = client.get_or_create_session(
         name=f"{tool_name}:{session_name}",
         system_instruction=system_instruction,
+        model=model,
     )
     effective_thinking: ThinkingLevel = thinking or client.default_thinking
-    _log.debug("%s session=%r thinking=%s", tool_name, session_name, effective_thinking)
+    _log.debug(
+        "%s session=%r model=%s thinking=%s",
+        tool_name,
+        session_name,
+        model or "default",
+        effective_thinking,
+    )
     try:
-        response = client.ask(session, prompt, thinking, system_instruction=system_instruction)
+        response = client.ask(
+            session, prompt, thinking, system_instruction=system_instruction, model=model
+        )
     except ClientError as exc:
         _log.error("%s session=%r failed: %s", tool_name, session_name, exc)
         return f"[gemini-bridge error] {exc}"

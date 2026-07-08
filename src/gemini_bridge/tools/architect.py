@@ -51,6 +51,10 @@ def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -
             "Reasoning depth: none, low, medium, high. Defaults to config setting.",
         ] = None,
         session_name: Annotated[str, "Session name for conversation continuity."] = "default",
+        model: Annotated[
+            Optional[str],
+            "Gemini model, e.g. 'gemini-2.5-flash'. Omit to use server default.",
+        ] = None,
     ) -> ToolResult:
         """Ask Gemini to evaluate a system design or architecture. Gemini will be opinionated
         where warranted and name tradeoffs explicitly when choices are context-dependent."""
@@ -63,4 +67,5 @@ def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -
             system_instruction=_SYSTEM_PROMPT,
             prompt=full_prompt,
             thinking=thinking,
+            model=model,
         )
