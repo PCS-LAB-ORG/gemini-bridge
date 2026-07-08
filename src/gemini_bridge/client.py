@@ -93,15 +93,26 @@ class GeminiClient:
             )
         return self._sessions[name]
 
-    def _build_generation_config(self, thinking: ThinkingLevel) -> GenerateContentConfig:
+    @property
+    def default_thinking(self) -> ThinkingLevel:
+        return self._config.default_thinking
+
+    def _build_generation_config(
+        self,
+        thinking: ThinkingLevel,
+        system_instruction: Optional[str] = None,
+    ) -> GenerateContentConfig:
         model = self._config.model
+        si = {"system_instruction": system_instruction} if system_instruction else {}
         if model.startswith("gemini-2."):
             return GenerateContentConfig(
-                thinking_config=ThinkingConfig(thinking_budget=_THINKING_BUDGET_2X[thinking])
+                thinking_config=ThinkingConfig(thinking_budget=_THINKING_BUDGET_2X[thinking]),
+                **si,
             )
         if model.startswith("gemini-3."):
             return GenerateContentConfig(
-                thinking_config=ThinkingConfig(thinking_level=_THINKING_LEVEL_3X[thinking])
+                thinking_config=ThinkingConfig(thinking_level=_THINKING_LEVEL_3X[thinking]),
+                **si,
             )
         raise ClientError(
             f"Unrecognized model family: {model!r}. "
@@ -113,10 +124,11 @@ class GeminiClient:
         session: Chat,
         prompt: str,
         thinking: Optional[ThinkingLevel] = None,
+        system_instruction: Optional[str] = None,
     ) -> str:
         """Send prompt to chat session, return response text. Raises ClientError on failure."""
         effective_thinking: ThinkingLevel = thinking or self._config.default_thinking
-        gen_config = self._build_generation_config(effective_thinking)
+        gen_config = self._build_generation_config(effective_thinking, system_instruction)
         _log.debug("ask: thinking=%s prompt_len=%d", effective_thinking, len(prompt))
         try:
             response = session.send_message(prompt, config=gen_config)
