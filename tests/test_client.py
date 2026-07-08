@@ -43,6 +43,20 @@ class TestSessionManagement:
         sb = client.get_or_create_session("brainstorm:default")
         assert sa is not sb
 
+    def test_session_cache_evicts_oldest_when_full(self) -> None:
+        from gemini_bridge.client import _MAX_SESSIONS
+
+        client = _make_client()
+        client._raw_client.chats.create.return_value = MagicMock()
+
+        # Fill cache past max
+        for i in range(_MAX_SESSIONS + 1):
+            client.get_or_create_session(f"session:{i}")
+
+        assert len(client._sessions) == _MAX_SESSIONS
+        assert "session:0" not in client._sessions  # oldest evicted
+        assert f"session:{_MAX_SESSIONS}" in client._sessions  # newest retained
+
 
 class TestThinkingConfig:
     def test_gemini2_thinking_none_maps_to_budget_zero(self) -> None:
