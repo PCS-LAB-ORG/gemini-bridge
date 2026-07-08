@@ -62,10 +62,17 @@ RECOMMENDED: dict[str, list[tuple[str, str]]] = {
     ],
 }
 
-# Name substrings that mark a NON-chat model. This is the decisive filter: image and TTS
-# models also report 'generateContent', so filtering on that action alone is insufficient
-# (verified live 2026-07-08). Name-based exclusion is what actually separates them.
-_NON_CHAT_MARKERS = ("image", "tts", "audio", "embedding", "live")
+# Name substrings that mark a NON-chat model. image/tts models also report 'generateContent',
+# so filtering on that action alone is insufficient (verified live 2026-07-08). Beyond the
+# media modalities, these also exclude specialized gemini-prefixed variants that are not
+# text-chat (computer-use, robotics, omni).
+_NON_CHAT_MARKERS = ("image", "tts", "audio", "embedding", "live", "computer-use", "robotics", "omni")
+
+# Allowlist of recognized Gemini chat generations. The live catalog also carries non-chat
+# families (gemma, lyria, nano-banana, antigravity, deep-research) that a name blocklist can't
+# anticipate, so we invert to an allowlist: only list models the bridge can actually run —
+# i.e. the generations _model_family() accepts. Kept in sync with client._model_family.
+_CHAT_GENERATION_PREFIXES = ("gemini-2", "gemini-3")
 
 
 def backend_for(auth_method: str) -> str:
@@ -99,14 +106,20 @@ def schema_hint(backend: str, default_model: str) -> str:
 
 
 def is_chat_capable(meta: ModelMeta) -> bool:
-    """True if a models.list() entry is a text/chat model (not image/tts/audio/embedding/live).
+    """True if a models.list() entry is a Gemini text/chat model the bridge can run.
 
     `meta` is a google.genai.types.Model (or any object with `.name` and `.supported_actions`).
-    The SDK field is `supported_actions` (a list[str]) — NOT `supportedGenerationMethods`
-    (that is the raw REST name). `generateContent` is necessary but NOT sufficient: image and
-    TTS models report it too, so a name-based exclusion is the decisive check.
+    Three gates, in order:
+      1. must report `generateContent` (necessary but NOT sufficient — image/tts models do too);
+      2. must not carry a non-chat marker (image/tts/audio/embedding/live/computer-use/robotics/omni);
+      3. must be a recognized Gemini chat generation (gemini-2*/gemini-3*) or a '-latest' alias —
+         an allowlist mirroring _model_family(), so non-chat families the bridge can't run
+         (gemma, lyria, nano-banana, antigravity, deep-research) never appear.
+    Previews (e.g. gemini-3-pro-preview) are intentionally included — they are valid, usable models.
     """
     name = (getattr(meta, "name", "") or "").split("/")[-1]
+    if "generateContent" not in (getattr(meta, "supported_actions", None) or []):
+        return False
     if any(marker in name for marker in _NON_CHAT_MARKERS):
         return False
-    return "generateContent" in (getattr(meta, "supported_actions", None) or [])
+    return name.startswith(_CHAT_GENERATION_PREFIXES) or name.endswith("-latest")
