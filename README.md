@@ -44,10 +44,8 @@ All tools share optional `thinking` (`none`/`low`/`medium`/`high`) and `session_
 | Requirement | Notes |
 |---|---|
 | Python 3.11+ | `python3 --version` |
-| gcloud CLI | [Install guide](https://cloud.google.com/sdk/docs/install) |
-| GCP project | With Vertex AI (Agent Platform) API enabled |
 | Claude Code | MCP-enabled version |
-| Auth | ADC, SA key file, or Apple Keychain — see [Auth methods](#auth-methods) |
+| Auth | **API key (easiest):** `export GEMINI_API_KEY=...` — get one at [aistudio.google.com/apikey](https://aistudio.google.com/apikey), no GCP needed · **Vertex AI:** ADC, SA key file, or Apple Keychain — requires gcloud CLI + GCP project — see [Auth methods](#auth-methods) |
 
 ---
 

@@ -135,6 +135,13 @@ class TestApiKey:
         result = build_auth(AuthConfig(method="api_key", api_key_env="GOOGLE_API_KEY"))
         assert result.api_key == "custom-key"
 
+    def test_build_auth_api_key_value_as_env_name_raises_auth_error(self) -> None:
+        # User pasted the key itself into api_key_env instead of a variable name
+        with pytest.raises(AuthError, match="looks like an API key"):
+            build_auth(
+                AuthConfig(method="api_key", api_key_env="AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+            )
+
     def test_build_auth_vertex_returns_credentials(self) -> None:
         mock_creds = MagicMock()
         with patch("google.auth.default", return_value=(mock_creds, "project")):
