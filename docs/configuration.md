@@ -21,10 +21,12 @@ Created by `bash setup.sh`. Safe to edit by hand.
 
 ## Field reference
 
-### `project` (required)
+### `project`
 
 **Type:** string
 **Example:** `"my-gcp-project"`
+**Required when:** `auth.method` is `adc`, `env`, or `keychain`
+**Omit when:** `auth.method = "api_key"` (Developer API does not use a GCP project)
 
 Your GCP project ID. Must have the Vertex AI API enabled and `roles/aiplatform.user`
 granted to your ADC credentials or service account.
@@ -97,7 +99,7 @@ collect transcripts globally instead.
 
 **Type:** string
 **Default:** `"adc"`
-**Valid values:** `adc`, `env`, `keychain`
+**Valid values:** `adc`, `env`, `keychain`, `api_key`
 
 See [auth.md](auth.md) for full setup instructions for each method.
 
@@ -120,3 +122,18 @@ The service name used in `security find-generic-password -s {service}`.
 **Only used when:** `auth.method = "keychain"`
 
 The account name used in `security find-generic-password -a {account}`.
+
+---
+
+### `auth.api_key_env`
+
+**Type:** string
+**Default:** `"GEMINI_API_KEY"`
+**Only used when:** `auth.method = "api_key"`
+
+The name of the environment variable holding your Google AI Studio API key. The key itself
+is never stored in `config.json` — only the variable name. At server startup, the server
+reads the key from this env var and raises an error if it is unset or empty.
+
+Common values: `"GEMINI_API_KEY"` (AI Studio default), `"GOOGLE_API_KEY"` (alternative).
+If both are set in your shell, `GOOGLE_API_KEY` takes precedence in the SDK.

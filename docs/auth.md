@@ -103,6 +103,53 @@ macOS only. The `security` CLI is not available on Linux.
 
 ---
 
+## Method 4: API Key (Google AI Studio)
+
+The simplest path — no GCP project, no `gcloud` setup, no service account. Get a key from
+[aistudio.google.com/apikey](https://aistudio.google.com/apikey) and set an environment variable.
+
+**One-time setup:**
+```bash
+export GEMINI_API_KEY=AIza...
+```
+
+Set this in your shell profile (e.g. `~/.zshrc`) or inject it via the Claude Code MCP env
+config (recommended — keeps the key out of shell history):
+```bash
+claude mcp add -s user gemini-bridge -e GEMINI_API_KEY=AIza... -- python3 -m gemini_bridge
+```
+
+**Run setup.sh and select option 4.** The wizard asks for the env var name (default:
+`GEMINI_API_KEY`) and warns if it is not currently set in the shell.
+
+**Config written by setup.sh:**
+```json
+{
+  "auth": {
+    "method": "api_key",
+    "api_key_env": "GEMINI_API_KEY"
+  },
+  "model": "gemini-2.5-flash",
+  "default_thinking": "medium",
+  "transcript_dir": "./session-summaries"
+}
+```
+
+`project` and `location` are omitted — they are not required by the Google AI Studio
+(Developer API) endpoint.
+
+**Positioning:**
+- Use this method for personal use, quick setup, or when you don't have a GCP project
+- ADC and Keychain methods remain first-class for team/enterprise use — they support larger
+  quota tiers, org-managed access control, and service account rotation
+- The API key is read from the env var at server startup and held in memory; it is never
+  written to `config.json`
+
+**Quota:** Google AI Studio free tier supports ~1,500 requests/day. Paid tier available.
+Quota limits are lower than Vertex AI service account access.
+
+---
+
 ## Troubleshooting
 
 | Error message | Cause | Fix |
@@ -113,3 +160,4 @@ macOS only. The `security` CLI is not available on Linux.
 | `Keychain item not found` | Secret not stored | Re-run the `security add-generic-password` command |
 | `not valid service account JSON` | Keychain value corrupted | Re-store the SA JSON key |
 | `'security' CLI not found` | Not macOS | Keychain method is macOS-only |
+| `'GEMINI_API_KEY' is not set or is empty` | API key env var missing | `export GEMINI_API_KEY=<your-key>` or set via MCP env config |

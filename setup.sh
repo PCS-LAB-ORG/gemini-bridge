@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # setup.sh — gemini-bridge interactive configuration wizard
-# Run once after pip install -e . to create ~/.config/gemini-bridge/config.json
+# Run once after "python3 -m pip install -e ." to create ~/.config/gemini-bridge/config.json
 # Safe to re-run: overwrites existing config with new values. Existing values
 # are read and used as prompt defaults so you only change what you want.
 
@@ -74,6 +74,7 @@ case "$PREV_AUTH_METHOD" in
     "adc")      PREV_AUTH_CHOICE="1" ;;
     "env")      PREV_AUTH_CHOICE="2" ;;
     "keychain") PREV_AUTH_CHOICE="3" ;;
+    "api_key")  PREV_AUTH_CHOICE="4" ;;
     *)          PREV_AUTH_CHOICE="1" ;;
 esac
 
@@ -84,14 +85,16 @@ echo
 
 # --- auth method ---
 echo "Auth method:"
-echo "  1) adc     — Application Default Credentials (recommended)"
-echo "  2) env     — GOOGLE_APPLICATION_CREDENTIALS env var (service account key file)"
+echo "  1) adc      — Application Default Credentials (recommended)"
+echo "  2) env      — GOOGLE_APPLICATION_CREDENTIALS env var (service account key file)"
 echo "  3) keychain — Service account JSON stored in Apple Keychain (macOS only)"
+echo "  4) api_key  — Google AI Studio API key (no GCP project needed)"
 AUTH_CHOICE=$(ask "Choice" "$PREV_AUTH_CHOICE")
 case "$AUTH_CHOICE" in
     1|adc)      AUTH_METHOD="adc" ;;
     2|env)      AUTH_METHOD="env" ;;
     3|keychain) AUTH_METHOD="keychain" ;;
+    4|api_key)  AUTH_METHOD="api_key" ;;
     *) error "Invalid choice: $AUTH_CHOICE" ;;
 esac
 
@@ -159,11 +162,41 @@ json.loads(raw)
     info "Keychain item OK"
 fi
 
-# --- project ---
+# API key auth: prompt for env var name and warn if not currently set
+API_KEY_ENV="GEMINI_API_KEY"
+if [[ "$AUTH_METHOD" == "api_key" ]]; then
+    echo
+    echo "The API key is read from an environment variable at server startup."
+    echo "Get a key at: https://aistudio.google.com/apikey"
+    PREV_API_KEY_ENV=$(python3 -c "
+import json, pathlib, sys
+p = pathlib.Path('$CONFIG_FILE')
+if p.exists():
+    d = json.loads(p.read_text())
+    print(d.get('auth', {}).get('api_key_env', 'GEMINI_API_KEY'))
+else:
+    print('GEMINI_API_KEY')
+" 2>/dev/null || echo "GEMINI_API_KEY")
+    API_KEY_ENV=$(ask "API key env var name" "$PREV_API_KEY_ENV")
+    [[ -z "$API_KEY_ENV" ]] && API_KEY_ENV="GEMINI_API_KEY"
+    if [[ -z "${!API_KEY_ENV:-}" ]]; then
+        warn "$API_KEY_ENV is not set in this shell."
+        echo "  Set it before starting Claude Code, or pass it via MCP env config:"
+        echo "    export $API_KEY_ENV=<your-key>"
+        echo "  (Proceeding — you can set the env var later)"
+    else
+        info "$API_KEY_ENV is set"
+    fi
+fi
+
+# --- project (skipped for api_key mode) ---
+PROJECT=""
+if [[ "$AUTH_METHOD" != "api_key" ]]; then
 # Prefer gcloud active project; fall back to existing config value
 DEFAULT_PROJECT="${PREV_PROJECT:-$(gcloud config get-value project 2>/dev/null || true)}"
 PROJECT=$(ask "GCP project" "$DEFAULT_PROJECT")
 [[ -z "$PROJECT" ]] && error "GCP project is required."
+fi
 
 # --- model (before location — location options depend on model family) ---
 echo
@@ -181,17 +214,20 @@ case "$MODEL_CHOICE" in
     *) error "Invalid choice: $MODEL_CHOICE" ;;
 esac
 
-# --- location (gemini-3.x is global-only; gemini-2.x allows regions) ---
-echo
-if [[ "$MODEL" == gemini-3.* ]]; then
-    LOCATION="global"
-    info "Location: global (required for $MODEL)"
-else
-    echo "Location (gemini-2.x supports 'global' or a specific region):"
-    echo "  global — recommended; routes to lowest-latency region automatically"
-    echo "  us-central1, us-east4, europe-west1, asia-northeast1, etc."
-    LOCATION=$(ask "Location" "$PREV_LOCATION")
-    [[ -z "$LOCATION" ]] && error "Location is required."
+# --- location (skipped for api_key mode; gemini-3.x is global-only) ---
+LOCATION="global"
+if [[ "$AUTH_METHOD" != "api_key" ]]; then
+    echo
+    if [[ "$MODEL" == gemini-3.* ]]; then
+        LOCATION="global"
+        info "Location: global (required for $MODEL)"
+    else
+        echo "Location (gemini-2.x supports 'global' or a specific region):"
+        echo "  global — recommended; routes to lowest-latency region automatically"
+        echo "  us-central1, us-east4, europe-west1, asia-northeast1, etc."
+        LOCATION=$(ask "Location" "$PREV_LOCATION")
+        [[ -z "$LOCATION" ]] && error "Location is required."
+    fi
 fi
 
 # --- thinking level ---
@@ -214,12 +250,17 @@ TRANSCRIPT_DIR=$(ask "Transcript directory" "$PREV_TRANSCRIPT_DIR")
 # --- write config ---
 mkdir -p "$CONFIG_DIR"
 
-# Build auth JSON block — keychain method includes service/account fields
+# Build auth JSON block — varies by method
 if [[ "$AUTH_METHOD" == "keychain" ]]; then
     AUTH_JSON="\"auth\": {
     \"method\": \"keychain\",
     \"keychain_service\": \"$KEYCHAIN_SERVICE\",
     \"keychain_account\": \"$KEYCHAIN_ACCOUNT\"
+  }"
+elif [[ "$AUTH_METHOD" == "api_key" ]]; then
+    AUTH_JSON="\"auth\": {
+    \"method\": \"api_key\",
+    \"api_key_env\": \"$API_KEY_ENV\"
   }"
 else
     AUTH_JSON="\"auth\": {
@@ -227,6 +268,17 @@ else
   }"
 fi
 
+# api_key mode: project and location are not needed
+if [[ "$AUTH_METHOD" == "api_key" ]]; then
+cat > "$CONFIG_FILE" <<EOF
+{
+  "model": "$MODEL",
+  "default_thinking": "$THINKING",
+  "transcript_dir": "$TRANSCRIPT_DIR",
+  $AUTH_JSON
+}
+EOF
+else
 cat > "$CONFIG_FILE" <<EOF
 {
   "project": "$PROJECT",
@@ -237,12 +289,13 @@ cat > "$CONFIG_FILE" <<EOF
   $AUTH_JSON
 }
 EOF
+fi
 
 info "Config written to $CONFIG_FILE"
 echo
 info "=== Next steps ==="
 echo
-echo "  pip install -e ."
+echo "  python3 -m pip install -e ."
 echo "  claude mcp add -s user gemini-bridge -- python3 -m gemini_bridge"
 echo "  claude mcp list"
 echo
