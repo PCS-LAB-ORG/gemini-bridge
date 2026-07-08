@@ -162,7 +162,12 @@ class GeminiClient:
                     _log.error("inference failed%s: %s", suffix, exc)
                     raise ClientError(f"Gemini inference failed{suffix}: {exc}") from exc
         if not response.text:
-            _log.warning("Gemini returned an empty response")
-            raise ClientError("Gemini returned an empty response.")
+            finish_reason = "UNKNOWN"
+            try:
+                finish_reason = response.candidates[0].finish_reason.name
+            except Exception:
+                pass
+            _log.warning("Gemini returned no text (finish_reason=%s)", finish_reason)
+            raise ClientError(f"Gemini returned no text (finish_reason={finish_reason}).")
         _log.debug("response_len=%d", len(response.text))
         return response.text
