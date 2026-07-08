@@ -37,7 +37,7 @@ Default: `INFO`.
 **Normal startup (INFO):**
 ```
 [gemini-bridge] 17:50:10 INFO     gemini_bridge.__main__: starting — auth=keychain model=gemini-3.1-pro-preview location=global
-[gemini-bridge] 17:50:10 INFO     gemini_bridge.__main__: transcript → ~/session-summaries/20260702-1750-gemini-transcript.md
+[gemini-bridge] 17:50:10 INFO     gemini_bridge.__main__: transcript → ~/session-summaries/20260702-1750-gemini-bridge-transcript.md
 ```
 
 **Auth failure (ERROR):**

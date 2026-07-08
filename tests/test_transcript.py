@@ -11,7 +11,7 @@ def test_transcript_file_created() -> None:
     startup = datetime(2026, 7, 2, 14, 30, 0)
     with tempfile.TemporaryDirectory() as tmp:
         writer = TranscriptWriter(tmp, startup)
-        assert writer.path.name == "20260702-1430-gemini-transcript.md"
+        assert writer.path.name == "20260702-1430-gemini-bridge-transcript.md"
 
 
 def test_transcript_dir_created() -> None:
