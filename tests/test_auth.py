@@ -5,7 +5,7 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
-from gemini_bridge.auth import AuthError, build_credentials
+from gemini_bridge.auth import AuthError, build_auth, build_credentials
 from gemini_bridge.config import AuthConfig, ConfigError
 
 
@@ -106,3 +106,38 @@ class TestUnknownMethod:
         config = AuthConfig.model_construct(method="unknown")  # type: ignore[call-arg]
         with pytest.raises((ConfigError, AuthError)):
             build_credentials(config)
+
+
+class TestApiKey:
+    def test_build_auth_api_key_reads_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key-123")
+        result = build_auth(AuthConfig(method="api_key"))
+        assert result.api_key == "test-key-123"
+        assert result.credentials is None
+
+    def test_build_auth_api_key_missing_raises_auth_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        with pytest.raises(AuthError, match="GEMINI_API_KEY"):
+            build_auth(AuthConfig(method="api_key"))
+
+    def test_build_auth_api_key_empty_raises_auth_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("GEMINI_API_KEY", "  ")
+        with pytest.raises(AuthError, match="GEMINI_API_KEY"):
+            build_auth(AuthConfig(method="api_key"))
+
+    def test_build_auth_api_key_custom_env_name(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("GOOGLE_API_KEY", "custom-key")
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        result = build_auth(AuthConfig(method="api_key", api_key_env="GOOGLE_API_KEY"))
+        assert result.api_key == "custom-key"
+
+    def test_build_auth_vertex_returns_credentials(self) -> None:
+        mock_creds = MagicMock()
+        with patch("google.auth.default", return_value=(mock_creds, "project")):
+            result = build_auth(AuthConfig(method="adc"))
+        assert result.credentials is mock_creds
+        assert result.api_key is None

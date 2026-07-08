@@ -90,7 +90,7 @@ _log = logging.getLogger("gemini_bridge.__main__")
 def main() -> None:
     startup_time = _startup_time
 
-    from gemini_bridge.auth import AuthError, build_credentials
+    from gemini_bridge.auth import AuthError, build_auth
     from gemini_bridge.client import GeminiClient
     from gemini_bridge.config import ConfigError, load_config
     from gemini_bridge.server import build_server
@@ -103,19 +103,22 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        credentials = build_credentials(config.auth)
+        auth_result = build_auth(config.auth)
     except AuthError as exc:
         _log.error("startup failed — auth error: %s", exc)
         sys.exit(1)
 
-    _log.info(
-        "starting — auth=%s model=%s location=%s",
-        config.auth.method,
-        config.model,
-        config.location,
-    )
+    if config.auth.method == "api_key":
+        _log.info("starting — auth=api_key model=%s", config.model)
+    else:
+        _log.info(
+            "starting — auth=%s model=%s location=%s",
+            config.auth.method,
+            config.model,
+            config.location,
+        )
 
-    client = GeminiClient(config, credentials)
+    client = GeminiClient(config, credentials=auth_result.credentials, api_key=auth_result.api_key)
     transcript = TranscriptWriter(config.transcript_dir, startup_time)
 
     _log.info("transcript → %s", transcript.path)

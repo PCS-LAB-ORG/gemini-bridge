@@ -30,7 +30,7 @@ from pydantic import BaseModel, field_validator, model_validator
 CONFIG_PATH: Path = Path.home() / ".config" / "gemini-bridge" / "config.json"
 
 ThinkingLevel = Literal["none", "low", "medium", "high"]
-AuthMethod = Literal["adc", "env", "keychain"]
+AuthMethod = Literal["adc", "env", "keychain", "api_key"]
 
 
 class ConfigError(Exception):
@@ -42,6 +42,8 @@ class AuthConfig(BaseModel):
     # None for adc/env; defaults applied by validator when method="keychain"
     keychain_service: Optional[str] = None
     keychain_account: Optional[str] = None
+    # Only read when method="api_key"; stores env var NAME, never the key value
+    api_key_env: Optional[str] = "GEMINI_API_KEY"
 
     @model_validator(mode="after")
     def apply_keychain_defaults(self) -> "AuthConfig":
@@ -54,7 +56,7 @@ class AuthConfig(BaseModel):
 
 
 class Config(BaseModel):
-    project: str
+    project: Optional[str] = None  # required for adc/env/keychain; unused for api_key
     location: str = "global"
     model: str = "gemini-2.5-flash"
     default_thinking: ThinkingLevel = "medium"
@@ -71,7 +73,18 @@ class Config(BaseModel):
         return v
 
     @model_validator(mode="after")
+    def project_required_for_vertex(self) -> "Config":
+        if self.auth.method != "api_key" and not self.project:
+            raise ValueError(
+                "'project' is required for Vertex AI auth methods (adc, env, keychain). "
+                "Add it to config.json or switch to method='api_key'."
+            )
+        return self
+
+    @model_validator(mode="after")
     def location_compatible_with_model(self) -> "Config":
+        if self.auth.method == "api_key":
+            return self  # location is unused in Developer API mode
         if self.model.startswith("gemini-3.") and self.location != "global":
             raise ValueError(
                 f"Model {self.model!r} only supports location='global' on Vertex AI. "

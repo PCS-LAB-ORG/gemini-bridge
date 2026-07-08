@@ -59,14 +59,22 @@ class ClientError(Exception):
 class GeminiClient:
     """Manages persistent Gemini chat sessions and provides a unified ask() interface."""
 
-    def __init__(self, config: Config, credentials: google.auth.credentials.Credentials) -> None:
+    def __init__(
+        self,
+        config: Config,
+        credentials: Optional[google.auth.credentials.Credentials] = None,
+        api_key: Optional[str] = None,
+    ) -> None:
         self._config = config
-        self._raw_client = genai.Client(
-            vertexai=True,
-            project=config.project,
-            location=config.location,
-            credentials=credentials,
-        )
+        if api_key:
+            self._raw_client = genai.Client(api_key=api_key)
+        else:
+            self._raw_client = genai.Client(
+                vertexai=True,
+                project=config.project,
+                location=config.location,
+                credentials=credentials,
+            )
         self._sessions: dict[str, Chat] = {}
 
     def get_or_create_session(

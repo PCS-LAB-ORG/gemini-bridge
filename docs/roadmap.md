@@ -67,9 +67,11 @@ directory requires editing `~/.config/gemini-bridge/config.json` and restarting 
 The tool lets Claude redirect transcripts to the active project's `session-summaries/`
 without a manual config edit.
 
-### Google AI Studio API Key Auth (#30)
+### Google AI Studio API Key Auth (#30) ✓ Shipped
 
 API key auth method for Google AI Studio — the non-Vertex, public-facing Gemini endpoint.
+`AuthResult` dataclass + `build_auth()` unified dispatch in `auth.py`. `Config.project`
+made optional with conditional validator. No GCP project or `gcloud` setup required.
 
 **Why:** Google AI Studio is hugely popular. Supporting API key auth makes gemini-bridge
 accessible without a GCP project. The design keeps secure auth (ADC, Keychain) as first-class

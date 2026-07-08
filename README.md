@@ -5,7 +5,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11+-blue.svg">
   <img alt="MCP" src="https://img.shields.io/badge/MCP-1.28-green.svg">
   <img alt="Vertex AI" src="https://img.shields.io/badge/Vertex%20AI-Gemini-orange.svg">
-  <img alt="Auth" src="https://img.shields.io/badge/auth-ADC%20%7C%20env%20%7C%20Keychain-purple.svg">
+  <img alt="Auth" src="https://img.shields.io/badge/auth-ADC%20%7C%20env%20%7C%20Keychain%20%7C%20API%20key-purple.svg">
   <img alt="Tests" src="https://img.shields.io/badge/tests-44%20passing-brightgreen.svg">
 </p>
 
@@ -84,14 +84,15 @@ Restart Claude Code after step 3. On next start you'll see startup entries in th
 
 | Field | Default | Description |
 |---|---|---|
-| `project` | — | GCP project ID (required) |
-| `location` | `global` | Vertex AI location; `global` works for all models; specific regions for gemini-2.x only |
+| `project` | — | GCP project ID (required for `adc`/`env`/`keychain`; omit for `api_key`) |
+| `location` | `global` | Vertex AI location; `global` works for all models; specific regions for gemini-2.x only; omit for `api_key` |
 | `model` | `gemini-2.5-flash` | Gemini model ID (`gemini-2.*` or `gemini-3.*`) |
 | `default_thinking` | `medium` | Thinking level when omitted per call |
 | `transcript_dir` | `./session-summaries` | Transcript directory; relative paths resolve to the project root where Claude Code was launched |
-| `auth.method` | `adc` | `adc` · `env` · `keychain` |
-| `auth.keychain_service` | `gemini-bridge` | Keychain service name (keychain method only) |
-| `auth.keychain_account` | `vertex-sa` | Keychain account name (keychain method only) |
+| `auth.method` | `adc` | `adc` · `env` · `keychain` · `api_key` |
+| `auth.keychain_service` | `gemini-bridge` | Keychain service name (`keychain` only) |
+| `auth.keychain_account` | `vertex-sa` | Keychain account name (`keychain` only) |
+| `auth.api_key_env` | `GEMINI_API_KEY` | Env var name holding the AI Studio key (`api_key` only; key is never stored in config) |
 
 See [docs/configuration.md](docs/configuration.md) for full field reference including location constraints per model family.
 
@@ -99,7 +100,7 @@ See [docs/configuration.md](docs/configuration.md) for full field reference incl
 
 ## Auth methods
 
-Three methods supported — `setup.sh` walks you through all of them.
+Four methods supported — `setup.sh` walks you through all of them.
 
 **ADC (recommended for personal machines):**
 ```bash
@@ -125,7 +126,14 @@ rm /path/to/sa-key.json   # remove disk copy
 ```
 SA JSON loaded to memory at startup; zero disk artifact after store. `setup.sh` verifies the item exists and contains valid JSON before writing config.
 
-**Minimum GCP role for service account:** `roles/aiplatform.user` (renamed from "Vertex AI Platform User" to "Agent Platform User" in 2026 — same role ID `roles/aiplatform.user`).
+**API key (Google AI Studio — no GCP project needed):**
+```bash
+export GEMINI_API_KEY=AIza...
+# Sets method: "api_key" in config
+```
+Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). No GCP project, no `gcloud` setup. Lower quota limits than Vertex AI — suitable for personal use and quick setup. The key is read from the env var at startup; it is never written to `config.json`.
+
+**Minimum GCP role for service account:** `roles/aiplatform.user` (renamed from "Vertex AI Platform User" to "Agent Platform User" in 2026 — same role ID `roles/aiplatform.user`). Not required for `api_key` mode.
 
 ---
 

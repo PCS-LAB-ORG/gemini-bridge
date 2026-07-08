@@ -34,6 +34,9 @@ logs/
 # Internal review artifacts (local only — not user-facing docs)
 code-reviews/
 
+# Working context: plans, research, scratch (local only — not for public distribution)
+context/
+
 # Claude Code instructions (internal — not for public distribution)
 CLAUDE.md
 
