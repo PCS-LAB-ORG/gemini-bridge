@@ -23,7 +23,14 @@ Imports:  client.py (GeminiClient), transcript.py (TranscriptWriter), config.py 
 import logging
 from typing import Optional
 
-from gemini_bridge.client import FALLBACK_MODEL, ClientError, GeminiClient, _is_retryable
+from gemini_bridge import models
+from gemini_bridge.client import (
+    DEFAULT_MODEL,
+    FALLBACK_MODEL,
+    ClientError,
+    GeminiClient,
+    _is_retryable,
+)
 
 _log = logging.getLogger(__name__)
 from gemini_bridge.config import ThinkingLevel
@@ -34,6 +41,16 @@ ToolResult = str
 
 # Optional thinking level parameter type accepted by every tool.
 ThinkingParam = Optional[ThinkingLevel]
+
+
+def model_param_hint(client: GeminiClient) -> str:
+    """Backend-aware description for the `model` param, computed once at tool registration.
+
+    api_key mode surfaces the Developer-API shortlist (incl. '-latest' aliases); Vertex
+    modes surface the alias-free Vertex shortlist. Injected into each tool's Annotated[...]
+    so the hint can never contradict the active backend.
+    """
+    return models.schema_hint(models.backend_for(client.auth_method), DEFAULT_MODEL)
 
 
 def call_gemini(
@@ -75,8 +92,10 @@ def call_gemini(
     try:
         response = _do_ask(model)
     except ClientError as exc:
-        # If retryable and a different model was requested, try the stable fallback once.
-        requested = model or FALLBACK_MODEL
+        # If retryable and the model we tried is not already the fallback, retry once on it.
+        # `model or DEFAULT_MODEL` reflects the model actually used — when the caller omits
+        # `model`, the default (not the fallback) was tried, so the fallback still applies.
+        requested = model or DEFAULT_MODEL
         if _is_retryable(exc) and requested != FALLBACK_MODEL:
             _log.warning(
                 "%s: model %r overloaded — falling back to %r",

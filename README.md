@@ -6,7 +6,7 @@
   <img alt="MCP" src="https://img.shields.io/badge/MCP-1.28-green.svg">
   <img alt="Vertex AI" src="https://img.shields.io/badge/Vertex%20AI-Gemini-orange.svg">
   <img alt="Auth" src="https://img.shields.io/badge/auth-ADC%20%7C%20env%20%7C%20Keychain%20%7C%20API%20key-purple.svg">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-44%20passing-brightgreen.svg">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-99%20passing-brightgreen.svg">
 </p>
 
 gemini-bridge is an MCP server that gives Claude Code a live Gemini counterpart. When Claude is working on a hard problem — an architectural decision, a tricky bug, a code review — it can consult Gemini as a second opinion without switching tools or context.
@@ -15,7 +15,7 @@ Sessions persist across all tool calls within a Claude Code session. Gemini accu
 
 Five focused tools, each with a distinct system prompt persona. Not a 37-tool Swiss Army knife.
 
-**Quick navigation:** [What it does](#what-it-does) | [Prerequisites](#prerequisites) | [Quick start](#quick-start) | [Configuration](#configuration) | [Auth methods](#auth-methods) | [Thinking levels](#thinking-levels) | [Roadmap](#roadmap) | [Full documentation](#full-documentation)
+**Quick navigation:** [What it does](#what-it-does) | [How it works](#how-it-works) | [Prerequisites](#prerequisites) | [Quick start](#quick-start) | [Configuration](#configuration) | [Choosing a model](#choosing-a-model) | [Auth methods](#auth-methods) | [Thinking levels](#thinking-levels) | [Roadmap](#roadmap) | [Full documentation](#full-documentation)
 
 ---
 
@@ -29,13 +29,40 @@ Five focused tools, each with a distinct system prompt persona. Not a 37-tool Sw
 | `gemini_debug` | Evidence-based, hypothesis-driven | `error` |
 | `gemini_architect` | Opinionated, explicit tradeoffs | `description` |
 
-All tools share optional `thinking` (`none`/`low`/`medium`/`high`) and `session_name` parameters. Claude picks thinking level based on question complexity.
+All five inference tools share optional `thinking` (`none`/`low`/`medium`/`high`), `session_name`, and `model` parameters. Claude picks thinking level based on question complexity, and may pick a `model` per call (omit for the server default).
 
-**Session model:** One Gemini chat session per tool name per Claude Code process. Context accumulates naturally within a session — later calls can reference earlier ones.
+A sixth utility tool, **`gemini_list_models`**, returns the chat-capable models available on your active backend — use it to discover valid `model=` values. See [Choosing a model](#choosing-a-model).
+
+**Session model:** One Gemini chat session per tool name per Claude Code process. Context accumulates naturally within a session — later calls can reference earlier ones. Changing `model` starts a separate session (sessions are keyed by tool + name + model).
 
 **Transcript logging:** Every exchange appended to `{transcript_dir}/YYYYMMDD-HHMM-gemini-bridge-transcript.md`.
 
 **Server logging:** Structured logs at `~/.config/gemini-bridge/logs/YYYYMMDD-gemini-bridge.log`. See [docs/logging.md](docs/logging.md).
+
+---
+
+## How it works
+
+```mermaid
+sequenceDiagram
+    participant CC as Claude Code
+    participant S as gemini-bridge (MCP server)
+    participant G as Gemini API<br/>(Developer API or Vertex AI)
+
+    CC->>S: gemini_ask(prompt, thinking?, model?)
+    Note over S: model = requested model<br/>or DEFAULT_MODEL (gemini-3.5-flash)
+    S->>G: send to chosen model
+    alt model overloaded (503/429)
+        G-->>S: terminal error
+        S->>G: retry once on FALLBACK_MODEL (gemini-2.5-flash)
+        G-->>S: response
+        Note over S: prepend "[gemini-bridge notice]" disclosure
+    else success
+        G-->>S: response
+    end
+    S->>S: append exchange to transcript
+    S-->>CC: response text
+```
 
 ---
 
@@ -70,7 +97,7 @@ claude mcp list
 Restart Claude Code after step 3. On next start you'll see startup entries in the log:
 
 ```
-[gemini-bridge] 17:50:10 INFO  gemini_bridge.__main__: starting — auth=keychain model=gemini-3.1-pro-preview location=global
+[gemini-bridge] 17:50:10 INFO  gemini_bridge.__main__: starting — auth=keychain location=global default_thinking=medium default_model=gemini-3.5-flash
 [gemini-bridge] 17:50:10 INFO  gemini_bridge.__main__: transcript → ~/session-summaries/20260702-1750-gemini-bridge-transcript.md
 ```
 
@@ -83,8 +110,7 @@ Restart Claude Code after step 3. On next start you'll see startup entries in th
 | Field | Default | Description |
 |---|---|---|
 | `project` | — | GCP project ID (required for `adc`/`env`/`keychain`; omit for `api_key`) |
-| `location` | `global` | Vertex AI location; `global` works for all models; specific regions for gemini-2.x only; omit for `api_key` |
-| `model` | `gemini-2.5-flash` | Gemini model ID (`gemini-2.*` or `gemini-3.*`) |
+| `location` | `global` | Vertex AI location; `global` is recommended and works for all models; omit for `api_key` |
 | `default_thinking` | `medium` | Thinking level when omitted per call |
 | `transcript_dir` | `./session-summaries` | Transcript directory; relative paths resolve to the project root where Claude Code was launched |
 | `auth.method` | `adc` | `adc` · `env` · `keychain` · `api_key` |
@@ -92,7 +118,32 @@ Restart Claude Code after step 3. On next start you'll see startup entries in th
 | `auth.keychain_account` | `vertex-sa` | Keychain account name (`keychain` only) |
 | `auth.api_key_env` | `GEMINI_API_KEY` | Env var name holding the AI Studio key (`api_key` only; key is never stored in config) |
 
-See [docs/configuration.md](docs/configuration.md) for full field reference including location constraints per model family.
+> **Note:** There is no `model` config field. The default model is built into the server
+> (`gemini-3.5-flash`); select a different model **per call** via the `model=` parameter on any
+> tool. See [Choosing a model](#choosing-a-model).
+
+See [docs/configuration.md](docs/configuration.md) for the full field reference.
+
+---
+
+## Choosing a model
+
+Every tool accepts an optional `model=` parameter. Omit it to use the server default
+(`gemini-3.5-flash`), which transparently falls back to `gemini-2.5-flash` if the endpoint is
+overloaded (503/429), with a visible notice in the response.
+
+The recommended set is **backend-aware** — the `model` parameter's description adapts to your
+active backend, and `gemini_list_models` returns the live, chat-only catalog:
+
+| Backend (`auth.method`) | Recommended models | `-latest` aliases |
+|---|---|---|
+| **Developer API** (`api_key`) | `gemini-3.5-flash` (default), `gemini-2.5-flash`, `gemini-flash-latest`, `gemini-pro-latest`, `gemini-2.5-pro` | ✅ supported |
+| **Vertex AI** (`adc`/`env`/`keychain`) | `gemini-3.5-flash` (default), `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.1-flash-lite` | ❌ 404 on Vertex — use versioned names |
+
+`-latest` aliases (e.g. `gemini-flash-latest`) are a **Developer-API-only** convention; they
+return 404 on Vertex AI. Call `gemini_list_models` any time for the authoritative list scoped to
+your backend. See [docs/configuration.md](docs/configuration.md#choosing-a-model) and
+[docs/tools.md](docs/tools.md#gemini_list_models).
 
 ---
 

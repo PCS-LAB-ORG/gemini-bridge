@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+
 from gemini_bridge.config import Config, ConfigError, load_config
 
 

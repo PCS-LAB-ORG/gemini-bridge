@@ -2,25 +2,75 @@
 
 ## Component Diagram
 
-```
-__main__.py
-  ├── load_config()          → config.py  → ~/.config/gemini-bridge/config.json
-  ├── build_credentials()    → auth.py    → google.auth.credentials.Credentials
-  ├── GeminiClient(config, creds)         → client.py
-  ├── TranscriptWriter(dir, time)         → transcript.py
-  └── build_server(client, transcript)   → server.py
-        └── FastMCP + 5 registered tools → tools/*.py
+```mermaid
+graph TD
+    M["__main__.py"] --> CFG["load_config()<br/>config.py"]
+    M --> AUTH["build_auth()<br/>auth.py"]
+    M --> CL["GeminiClient(config, creds)<br/>client.py"]
+    M --> TR["TranscriptWriter(dir, time)<br/>transcript.py"]
+    M --> SRV["build_server(client, transcript)<br/>server.py"]
+
+    CFG --> JSON["~/.config/gemini-bridge/config.json"]
+    AUTH --> CRED["google.auth Credentials<br/>or API key"]
+
+    SRV --> MCP["FastMCP + 6 registered tools"]
+    MCP --> T1["gemini_ask"]
+    MCP --> T2["gemini_brainstorm"]
+    MCP --> T3["gemini_review"]
+    MCP --> T4["gemini_debug"]
+    MCP --> T5["gemini_architect"]
+    MCP --> T6["gemini_list_models"]
+
+    T1 & T2 & T3 & T4 & T5 --> BASE["tools/base.py<br/>call_gemini() + model_param_hint()"]
+    BASE --> CL
+    T6 --> CL
+    BASE & T6 --> MOD["models.py<br/>shortlist / schema_hint / is_chat_capable"]
 ```
 
-## Data Flow (per tool call)
+The inference tools route through `tools/base.py`; `gemini_list_models` calls the client
+directly. Both consult `models.py` — the single source of truth for the model taxonomy
+(backend shortlists, the backend-aware schema hint, and the chat-capable filter).
 
-1. Claude Code sends an MCP tool call (e.g. `gemini_brainstorm`)
+## Data Flow (per inference tool call)
+
+1. Claude Code sends an MCP tool call (e.g. `gemini_brainstorm`) with an optional `model=`
 2. `server.py` routes to the registered tool function in `tools/brainstorm.py`
 3. Tool calls `call_gemini()` from `tools/base.py` with the session name, system prompt, and prompt
-4. `call_gemini()` calls `client.get_or_create_session()` — creates a chat session on first use
-5. `client.ask()` builds a `GenerateContentConfig` with the thinking level, sends to Vertex AI
-6. Response text is returned; `transcript.append()` writes the exchange to the Markdown file
-7. Tool returns the response string as the MCP tool result to Claude Code
+4. `call_gemini()` resolves the effective model (`model` or `DEFAULT_MODEL`) and calls
+   `client.get_or_create_session()` — one session per `tool:session_name:model`
+5. `client.ask()` builds a `GenerateContentConfig` with the thinking level and sends to the
+   active backend (Developer API or Vertex AI)
+6. On a terminal 503/429, `call_gemini()` retries once against `FALLBACK_MODEL` and prepends a
+   disclosure notice to the response
+7. `transcript.append()` writes the exchange to the Markdown file
+8. Tool returns the response string as the MCP tool result to Claude Code
+
+```mermaid
+sequenceDiagram
+    participant CC as Claude Code
+    participant T as Tool module
+    participant B as base.call_gemini()
+    participant C as client.py<br/>GeminiClient
+    participant G as Gemini backend
+
+    CC->>T: tool call (prompt, thinking?, model?)
+    T->>B: call_gemini(..., model)
+    B->>C: get_or_create_session(tool:name:model)
+    B->>C: ask(prompt, thinking, model)
+    C->>G: send_message (with GenerateContentConfig)
+    alt 503/429 after retries and model != FALLBACK_MODEL
+        G-->>C: terminal error
+        B->>C: ask(prompt, thinking, FALLBACK_MODEL)
+        C->>G: retry on gemini-2.5-flash
+        G-->>C: response
+        B-->>T: notice + response
+    else success
+        G-->>C: response
+        B-->>T: response
+    end
+    B->>B: transcript.append()
+    T-->>CC: response text
+```
 
 ## Session Lifecycle
 

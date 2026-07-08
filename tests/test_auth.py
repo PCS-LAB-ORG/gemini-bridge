@@ -5,6 +5,7 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from gemini_bridge.auth import AuthError, build_auth, build_credentials
 from gemini_bridge.config import AuthConfig, ConfigError
 
