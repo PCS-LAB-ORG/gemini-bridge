@@ -309,7 +309,14 @@ echo
 info "=== Next steps ==="
 echo
 echo "  python3 -m pip install -e ."
-echo "  claude mcp add -s user gemini-bridge -- python3 -m gemini_bridge"
+if [[ "$AUTH_METHOD" == "api_key" ]]; then
+    echo
+    echo "  # The API key must be passed directly to the server — shell exports don't"
+    echo "  # reach the MCP server process. Use the -e flag to inject it:"
+    echo "  claude mcp add -s user -e $API_KEY_ENV=<paste-your-key-here> -- python3 -m gemini_bridge"
+else
+    echo "  claude mcp add -s user gemini-bridge -- python3 -m gemini_bridge"
+fi
 echo "  claude mcp list"
 echo
 info "Done. Restart Claude Code to activate gemini-bridge."
