@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from gemini_bridge.client import _MAX_SESSIONS, DEFAULT_MODEL, ClientError, GeminiClient
 from gemini_bridge.config import Config
 
@@ -60,7 +61,7 @@ class TestSessionManagement:
             client.get_or_create_session(f"session:{i}")
 
         assert len(client._sessions) == _MAX_SESSIONS
-        assert "session:0:gemini-2.5-flash" not in client._sessions
+        assert f"session:0:{DEFAULT_MODEL}" not in client._sessions
         assert f"session:{_MAX_SESSIONS}:{DEFAULT_MODEL}" in client._sessions
 
 
