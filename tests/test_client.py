@@ -69,6 +69,17 @@ class TestThinkingConfig:
         config = client._build_generation_config("high")
         assert config.thinking_config.thinking_budget == 32768  # type: ignore[union-attr]
 
+    def test_gemini2_pro_thinking_none_clamped_to_minimum(self) -> None:
+        client = _make_client("gemini-2.5-pro")
+        config = client._build_generation_config("none")
+        # Pro models reject budget=0; must be clamped to 128
+        assert config.thinking_config.thinking_budget == 128  # type: ignore[union-attr]
+
+    def test_gemini2_flash_thinking_none_stays_zero(self) -> None:
+        client = _make_client("gemini-2.5-flash")
+        config = client._build_generation_config("none")
+        assert config.thinking_config.thinking_budget == 0  # type: ignore[union-attr]
+
     def test_gemini3_thinking_maps_to_level_enum(self) -> None:
         from google.genai.types import ThinkingLevel as SDKThinkingLevel
 

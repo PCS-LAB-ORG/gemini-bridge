@@ -45,6 +45,8 @@ _THINKING_BUDGET_2X: dict[str, int] = {
     "medium": 8192,
     "high": 32768,
 }
+# gemini-2.x Pro models enforce a minimum thinking budget of 128; budget=0 is rejected
+_THINKING_BUDGET_2X_PRO_MIN = 128
 
 # Thinking level enum values for Gemini 3.x models
 _THINKING_LEVEL_3X: dict[str, SDKThinkingLevel] = {
@@ -124,8 +126,16 @@ class GeminiClient:
         except ValueError as exc:
             raise ClientError(str(exc)) from exc
         if family == ModelFamily.GEMINI_2:
+            budget = _THINKING_BUDGET_2X[thinking]
+            if "pro" in self._config.model and budget < _THINKING_BUDGET_2X_PRO_MIN:
+                _log.debug(
+                    "thinking=none clamped to %d for Pro model %r",
+                    _THINKING_BUDGET_2X_PRO_MIN,
+                    self._config.model,
+                )
+                budget = _THINKING_BUDGET_2X_PRO_MIN
             return GenerateContentConfig(
-                thinking_config=ThinkingConfig(thinking_budget=_THINKING_BUDGET_2X[thinking]),
+                thinking_config=ThinkingConfig(thinking_budget=budget),
                 **si,
             )
         if family == ModelFamily.GEMINI_3:
