@@ -100,13 +100,17 @@ def _warn_model_backend_mismatch(model: str, is_vertex: bool) -> None:
 def _model_family(model: str) -> ModelFamily:
     """Resolve model string to ModelFamily. Raises ClientError for unrecognized names.
 
+    Generation is detected by the 'gemini-2' / 'gemini-3' prefix in either form — dotted
+    (gemini-3.5-flash, gemini-3.1-pro-preview) or hyphenated (gemini-3-pro-preview,
+    gemini-3-flash-preview). Both are valid, usable models; the hyphenated previews must
+    resolve to the right thinking-config family rather than being rejected.
+
     '-latest' aliases (gemini-flash-latest, gemini-pro-latest, etc.) are accepted and
-    treated as GEMINI_2 — they currently resolve to 2.x-generation models on the
-    Developer API. A debug log notes the assumption so it's visible if behavior changes.
+    treated as GEMINI_2. A debug log notes the assumption so it's visible if behavior changes.
     """
-    if model.startswith("gemini-2."):
+    if model.startswith("gemini-2"):
         return ModelFamily.GEMINI_2
-    if model.startswith("gemini-3."):
+    if model.startswith("gemini-3"):
         return ModelFamily.GEMINI_3
     if model.endswith("-latest") or "-latest-" in model:
         _log.debug(
@@ -117,7 +121,7 @@ def _model_family(model: str) -> ModelFamily:
         return ModelFamily.GEMINI_2
     raise ClientError(
         f"Unrecognized model family: {model!r}. "
-        "Expected 'gemini-2.*', 'gemini-3.*', or a '-latest' alias."
+        "Expected a 'gemini-2*' / 'gemini-3*' model or a '-latest' alias."
     )
 
 

@@ -88,6 +88,21 @@ class TestThinkingConfig:
         with pytest.raises(ClientError, match="Unrecognized model family"):
             client._build_generation_config("low", model="gpt-4-bad")
 
+    def test_gemini3_hyphen_preview_maps_to_level_enum(self) -> None:
+        # gemini-3-pro-preview (hyphen, no dot) is a valid Gemini 3 model and must use the
+        # 3.x thinking_level path — previously it raised "Unrecognized model family".
+        from google.genai.types import ThinkingLevel as SDKThinkingLevel
+
+        client = _make_client()
+        for model in ("gemini-3-pro-preview", "gemini-3-flash-preview"):
+            cfg = client._build_generation_config("medium", model=model)
+            assert cfg.thinking_config.thinking_level == SDKThinkingLevel.MEDIUM, model  # type: ignore[union-attr]
+
+    def test_gemini2_hyphen_form_maps_to_budget(self) -> None:
+        client = _make_client()
+        cfg = client._build_generation_config("low", model="gemini-2-flash-exp")
+        assert cfg.thinking_config.thinking_budget == 1024  # type: ignore[union-attr]
+
     def test_latest_alias_treated_as_gemini2(self) -> None:
         client = _make_client()
         cfg = client._build_generation_config("low", model="gemini-flash-latest")

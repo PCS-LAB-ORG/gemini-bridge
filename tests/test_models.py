@@ -93,3 +93,35 @@ class TestIsChatCapable:
     def test_bare_name_without_prefix(self) -> None:
         # Some SDK paths yield the id without a "models/" prefix.
         assert models.is_chat_capable(_meta("gemini-2.5-pro")) is True
+
+    # --- allowlist behavior (real ids from the live catalog 2026-07-08) ---
+
+    def test_gemini3_preview_included(self) -> None:
+        # Valid Gemini 3 previews must be listed (hyphen form, no dot).
+        assert models.is_chat_capable(_meta("models/gemini-3-pro-preview")) is True
+        assert models.is_chat_capable(_meta("models/gemini-3-flash-preview")) is True
+        assert models.is_chat_capable(_meta("models/gemini-3.1-pro-preview")) is True
+
+    def test_latest_aliases_included(self) -> None:
+        for alias in ("gemini-flash-latest", "gemini-pro-latest", "gemini-flash-lite-latest"):
+            assert models.is_chat_capable(_meta(f"models/{alias}")) is True
+
+    def test_non_gemini_families_excluded(self) -> None:
+        # Real non-chat / non-gemini families that carry generateContent but must NOT list.
+        for name in (
+            "models/gemma-4-31b-it",
+            "models/lyria-3-pro-preview",
+            "models/nano-banana-pro-preview",
+            "models/antigravity-preview-05-2026",
+            "models/deep-research-pro-preview-12-2025",
+        ):
+            assert models.is_chat_capable(_meta(name)) is False, name
+
+    def test_specialized_gemini_variants_excluded(self) -> None:
+        # gemini-prefixed but not text-chat.
+        for name in (
+            "models/gemini-2.5-computer-use-preview-10-2025",
+            "models/gemini-robotics-er-1.6-preview",
+            "models/gemini-omni-flash-preview",
+        ):
+            assert models.is_chat_capable(_meta(name)) is False, name
