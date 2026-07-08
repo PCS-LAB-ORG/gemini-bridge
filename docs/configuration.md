@@ -156,10 +156,11 @@ parameter; omit it to use the server default.
 The `-latest` aliases (e.g. `gemini-flash-latest`) are a **Developer-API-only** convention.
 On Vertex AI they return 404 — the bridge logs a warning if you pass one under a Vertex backend.
 
-> **Model families and thinking levels:** the model prefix determines how the `thinking` level
-> maps to API parameters — `gemini-2.*` (and `-latest` aliases) use a token `thinking_budget`;
-> `gemini-3.*` uses a `thinking_level` enum. An unrecognized prefix raises a `ClientError` at
-> call time. See [tools.md](tools.md) for the thinking-level table.
+> **Model families and thinking levels:** the generation prefix determines how the `thinking`
+> level maps to API parameters — `gemini-2*` (and `-latest` aliases) use a token `thinking_budget`;
+> `gemini-3*` uses a `thinking_level` enum. Both dotted (`gemini-3.5-flash`) and hyphenated
+> preview (`gemini-3-pro-preview`) forms are recognized, so previews are usable. An unrecognized
+> name raises a `ClientError` at call time. See [tools.md](tools.md) for the thinking-level table.
 
 ### How a model value is resolved
 

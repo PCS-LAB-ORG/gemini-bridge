@@ -17,7 +17,7 @@ pre-commit install --hook-type commit-msg
 python3 -m pytest tests/ -q
 ```
 
-99 tests across 7 modules. All mocked — no network calls, runs in under 2 seconds.
+105 tests across 7 modules. All mocked — no network calls, runs in under 2 seconds.
 
 ## Running the server locally
 

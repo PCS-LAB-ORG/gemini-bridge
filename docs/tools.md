@@ -189,20 +189,47 @@ written to the transcript.
 | `refresh` | bool | no | Re-fetch the live list, bypassing the per-process cache (default `false`) |
 
 **Behavior:**
-- Fetches the live catalog via the backend's `models.list`, then filters to **chat-capable**
-  models — image, TTS, audio, embedding, and live-streaming models are excluded (they report
-  `generateContent` too, so the filter is name-based, not capability-based).
+- Fetches the live catalog via the backend's `models.list`, then keeps only models the bridge
+  can actually run — an **allowlist**: recognized Gemini chat generations (`gemini-2*` /
+  `gemini-3*`, dotted or hyphenated) plus `-latest` aliases. Everything else is dropped:
+  - media/specialized variants by name marker — `image`, `tts`, `audio`, `embedding`, `live`,
+    `computer-use`, `robotics`, `omni` (several of these report `generateContent` too, so a
+    name check is required — the action alone is not sufficient);
+  - non-Gemini families the bridge can't run — Gemma, Lyria, Nano-Banana, Antigravity,
+    Deep Research, etc.
+  - **Previews are kept** (e.g. `gemini-3-pro-preview`) — they are valid, usable models.
 - Renders a compact table: model id, display name, and `(default)` / `(alias)` markers, headed
   by the active backend name. The default is listed first.
 - Caches the result for the process lifetime; `refresh=true` forces a re-fetch.
 - **Graceful degradation:** if the live catalog can't be fetched, returns the curated static
   shortlist (from `models.py`) with a clear "live list unavailable" notice instead of failing.
 
+> **Note:** the list is a *discovery aid*, not a hard whitelist — an explicitly-requested valid
+> model still runs even if it isn't listed (e.g. a specialized `gemini-2*`/`gemini-3*` variant).
+
 **Example:**
 ```
 gemini_list_models()
 gemini_list_models(refresh=True)   # force a fresh fetch
 ```
+
+**Sample output** (api_key / Developer API backend; abridged — your live list reflects the
+current catalog):
+```
+Gemini chat models on Developer API (Google AI Studio) (17 available):
+
+  gemini-3.5-flash                    (default)  — Gemini 3.5 Flash
+  gemini-2.5-flash                    — Gemini 2.5 Flash
+  gemini-2.5-pro                      — Gemini 2.5 Pro
+  gemini-3-pro-preview                — Gemini 3 Pro Preview
+  gemini-3.1-pro-preview              — Gemini 3.1 Pro Preview
+  gemini-flash-latest                 (alias)  — Gemini Flash Latest
+  gemini-pro-latest                   (alias)  — Gemini Pro Latest
+  …
+
+Pass model='<id>' to any tool. Omit to use the default (gemini-3.5-flash).
+```
+On a Vertex backend the header names Vertex AI and the `-latest` aliases are absent.
 
 **How it resolves:**
 
@@ -212,7 +239,7 @@ flowchart TD
     B -->|yes| C[return cached table]
     B -->|no| D["client.list_models → backend models.list"]
     D --> E{fetch ok?}
-    E -->|yes| F[filter to chat-capable<br/>drop image/tts/audio/embedding/live]
+    E -->|yes| F["allowlist: keep gemini-2*/gemini-3* + -latest<br/>drop media/specialized + non-Gemini families"]
     F --> G[render table<br/>default first, mark default/alias]
     G --> H[cache + return]
     E -->|no| I[return curated static shortlist<br/>+ 'live unavailable' notice<br/>not cached]
