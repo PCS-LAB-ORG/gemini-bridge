@@ -110,6 +110,13 @@ def main() -> None:
 
     if config.auth.method == "api_key":
         _log.info("starting — auth=api_key model=%s", config.model)
+        if config.model.startswith("gemini-3."):
+            _log.warning(
+                "model %r is a Gemini 3.x preview — availability via Google AI Studio API "
+                "keys varies. If you see 404 or 503 errors, switch to gemini-2.5-flash in "
+                "config.json (Vertex AI auth supports a broader 3.x catalog).",
+                config.model,
+            )
     else:
         _log.info(
             "starting — auth=%s model=%s location=%s",
