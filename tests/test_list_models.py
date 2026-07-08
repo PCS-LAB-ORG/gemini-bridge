@@ -45,6 +45,8 @@ class TestFormatModelList:
             _meta("models/gemini-2.5-flash-image", "Image"),  # must be filtered out
             _meta("models/gemini-2.5-flash-preview-tts", "TTS"),  # must be filtered out
             _meta("models/gemini-embedding-001", "Embed", actions=["embedContent"]),  # filtered
+            _meta("models/gemma-4-31b-it", "Gemma"),  # non-gemini family, filtered
+            _meta("models/gemini-2.5-computer-use-preview-10-2025", "CU"),  # specialized, filtered
         ]
 
     def test_excludes_non_chat_models(self) -> None:
@@ -52,6 +54,8 @@ class TestFormatModelList:
         assert "gemini-2.5-flash-image" not in out
         assert "gemini-2.5-flash-preview-tts" not in out
         assert "gemini-embedding-001" not in out
+        assert "gemma-4-31b-it" not in out
+        assert "computer-use" not in out
         assert "gemini-2.5-flash" in out
 
     def test_marks_default_and_alias(self) -> None:
