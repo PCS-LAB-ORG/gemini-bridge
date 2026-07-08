@@ -124,3 +124,39 @@ def test_keychain_explicit_service_account_preserved() -> None:
     cfg = AuthConfig(method="keychain", keychain_service="my-svc", keychain_account="my-acct")
     assert cfg.keychain_service == "my-svc"
     assert cfg.keychain_account == "my-acct"
+
+
+def test_api_key_method_no_project_accepted() -> None:
+    cfg = Config(auth={"method": "api_key"})
+    assert cfg.auth.method == "api_key"
+    assert cfg.project is None
+
+
+def test_api_key_env_default() -> None:
+    from gemini_bridge.config import AuthConfig
+
+    cfg = AuthConfig(method="api_key")
+    assert cfg.api_key_env == "GEMINI_API_KEY"
+
+
+def test_api_key_custom_env_preserved() -> None:
+    from gemini_bridge.config import AuthConfig
+
+    cfg = AuthConfig(method="api_key", api_key_env="GOOGLE_API_KEY")
+    assert cfg.api_key_env == "GOOGLE_API_KEY"
+
+
+def test_vertex_methods_require_project() -> None:
+    for method in ("adc", "env", "keychain"):
+        with pytest.raises(Exception, match="'project' is required"):
+            Config(auth={"method": method})
+
+
+def test_api_key_location_validator_skipped() -> None:
+    cfg = Config(auth={"method": "api_key"}, model="gemini-3.5-flash", location="us-central1")
+    assert cfg.location == "us-central1"
+
+
+def test_vertex_gemini3_non_global_still_rejected() -> None:
+    with pytest.raises(Exception, match="only supports location"):
+        Config(project="p", model="gemini-3.5-flash", location="us-central1")

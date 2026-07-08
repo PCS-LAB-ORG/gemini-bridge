@@ -25,8 +25,10 @@ Imports:  config.py (AuthConfig, ConfigError)
 
 import json
 import logging
+import os
 import subprocess
-from typing import Callable
+from dataclasses import dataclass
+from typing import Callable, Optional
 
 _log = logging.getLogger(__name__)
 
@@ -46,6 +48,14 @@ _CredLoader = Callable[[AuthConfig], google.auth.credentials.Credentials]
 
 class AuthError(Exception):
     """Raised when credential loading fails. Message is user-actionable."""
+
+
+@dataclass
+class AuthResult:
+    """Unified auth output — exactly one field is non-None after build_auth() succeeds."""
+
+    credentials: Optional[google.auth.credentials.Credentials] = None
+    api_key: Optional[str] = None
 
 
 def _load_adc(auth_config: AuthConfig) -> google.auth.credentials.Credentials:
@@ -126,6 +136,21 @@ def _load_keychain(auth_config: AuthConfig) -> google.auth.credentials.Credentia
     return service_account.Credentials.from_service_account_info(sa_info, scopes=_VERTEX_SCOPES)
 
 
+def _load_api_key(auth_config: AuthConfig) -> str:
+    """Read Gemini Developer API key from the configured env var. Raises AuthError if unset."""
+    env_var = auth_config.api_key_env or "GEMINI_API_KEY"
+    key = os.environ.get(env_var, "").strip()
+    if not key:
+        _log.error("api_key env var not set or empty: %s", env_var)
+        raise AuthError(
+            f"Gemini auth error: {env_var!r} is not set or is empty.\n"
+            f"Fix: export {env_var}=<your-Google-AI-Studio-key>\n"
+            "Get a key at: https://aistudio.google.com/apikey"
+        )
+    _log.debug("api_key loaded from %s", env_var)
+    return key
+
+
 _LOADERS: dict[str, _CredLoader] = {
     "adc": _load_adc,
     "env": _load_env,
@@ -134,8 +159,18 @@ _LOADERS: dict[str, _CredLoader] = {
 
 
 def build_credentials(auth_config: AuthConfig) -> google.auth.credentials.Credentials:
-    """Build credentials from the given auth config. Raises AuthError on failure."""
+    """Build Vertex AI credentials from the given auth config. Raises AuthError on failure."""
     loader = _LOADERS.get(auth_config.method)
     if loader is None:
         raise ConfigError(f"Unknown auth method: {auth_config.method!r}")
     return loader(auth_config)
+
+
+def build_auth(auth_config: AuthConfig) -> AuthResult:
+    """Unified auth dispatch for all methods. Raises AuthError or ConfigError on failure."""
+    if auth_config.method == "api_key":
+        return AuthResult(api_key=_load_api_key(auth_config))
+    loader = _LOADERS.get(auth_config.method)
+    if loader is None:
+        raise ConfigError(f"Unknown auth method: {auth_config.method!r}")
+    return AuthResult(credentials=loader(auth_config))
