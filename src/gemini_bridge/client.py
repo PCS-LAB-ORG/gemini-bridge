@@ -228,7 +228,14 @@ class GeminiClient:
                 else:
                     suffix = f" after {attempt} attempt(s)" if attempt > 1 else ""
                     _log.error("inference failed%s: %s", suffix, exc)
-                    raise ClientError(f"Gemini inference failed{suffix}: {exc}") from exc
+                    hint = ""
+                    if _is_retryable(exc):
+                        hint = (
+                            " The model appears overloaded or quota-limited. "
+                            "Try again shortly, or pass a different model "
+                            "(e.g. model='gemini-2.5-flash') to avoid the busy endpoint."
+                        )
+                    raise ClientError(f"Gemini inference failed{suffix}: {exc}{hint}") from exc
         if not response.text:
             finish_reason = "UNKNOWN"
             try:
