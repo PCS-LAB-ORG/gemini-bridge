@@ -87,6 +87,12 @@ class TestThinkingConfig:
         with pytest.raises(ClientError, match="Unrecognized model family"):
             client._build_generation_config("low", model="gpt-4-bad")
 
+    def test_latest_alias_treated_as_gemini2(self) -> None:
+        client = _make_client()
+        cfg = client._build_generation_config("low", model="gemini-flash-latest")
+        # Should use thinking_budget (GEMINI_2 path), not thinking_level
+        assert cfg.thinking_config.thinking_budget == 1024  # type: ignore[union-attr]
+
     def test_gemini2_pro_thinking_none_clamped_to_minimum(self) -> None:
         client = _make_client()
         config = client._build_generation_config("none", model="gemini-2.5-pro")

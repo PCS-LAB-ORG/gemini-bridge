@@ -9,8 +9,8 @@ from gemini_bridge.tools.base import call_gemini
 from gemini_bridge.transcript import TranscriptWriter
 
 
-def _make_client(model: str = "gemini-2.5-flash") -> GeminiClient:
-    config = Config(project="test-project", model=model)
+def _make_client() -> GeminiClient:
+    config = Config(project="test-project")
     mock_creds = MagicMock()
     with patch("google.genai.Client"):
         return GeminiClient(config, mock_creds)
@@ -82,6 +82,35 @@ class TestCallGemini:
         content = transcript.path.read_text()
         assert "gemini_review" in content
         assert "Check this code." in content
+
+    def test_fallback_to_default_model_on_503(self, tmp_path: object) -> None:
+        from gemini_bridge.client import FALLBACK_MODEL
+
+        client = _make_client()
+        mock_busy_chat = MagicMock()
+        mock_busy_chat.send_message.side_effect = Exception("503 UNAVAILABLE model overloaded")
+        mock_fallback_chat = MagicMock()
+        mock_fallback_response = MagicMock()
+        mock_fallback_response.text = "fallback answer"
+        mock_fallback_chat.send_message.return_value = mock_fallback_response
+        client._raw_client.chats.create.side_effect = [mock_busy_chat, mock_fallback_chat]
+
+        transcript = _make_transcript(tmp_path)
+        with patch("gemini_bridge.client.time.sleep"):
+            result = call_gemini(
+                client=client,
+                transcript=transcript,
+                tool_name="gemini_ask",
+                session_name="default",
+                system_instruction="Answer.",
+                prompt="Hello",
+                thinking="low",
+                model="gemini-3.5-flash",  # busy model
+            )
+        assert "[gemini-bridge notice]" in result
+        assert "gemini-3.5-flash" in result
+        assert FALLBACK_MODEL in result
+        assert "fallback answer" in result
 
 
 class TestToolRegistration:

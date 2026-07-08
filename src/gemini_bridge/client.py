@@ -40,6 +40,8 @@ from gemini_bridge.config import Config, ModelFamily, ThinkingLevel
 
 # Default model used when a tool call does not specify one.
 DEFAULT_MODEL = "gemini-2.5-flash"
+# Stable fallback model used when the requested model returns a terminal 503/429.
+FALLBACK_MODEL = "gemini-2.5-flash"
 
 # Thinking budget token counts for Gemini 2.x models
 _THINKING_BUDGET_2X: dict[str, int] = {
@@ -92,14 +94,26 @@ def _warn_model_backend_mismatch(model: str, is_vertex: bool) -> None:
 
 
 def _model_family(model: str) -> ModelFamily:
-    """Resolve model string to ModelFamily. Raises ClientError for unrecognized names."""
+    """Resolve model string to ModelFamily. Raises ClientError for unrecognized names.
+
+    '-latest' aliases (gemini-flash-latest, gemini-pro-latest, etc.) are accepted and
+    treated as GEMINI_2 — they currently resolve to 2.x-generation models on the
+    Developer API. A debug log notes the assumption so it's visible if behavior changes.
+    """
     if model.startswith("gemini-2."):
         return ModelFamily.GEMINI_2
     if model.startswith("gemini-3."):
         return ModelFamily.GEMINI_3
+    if model.endswith("-latest") or "-latest-" in model:
+        _log.debug(
+            "model %r uses a '-latest' alias; assuming GEMINI_2 thinking-config. "
+            "If thinking-config errors occur, specify a versioned model instead.",
+            model,
+        )
+        return ModelFamily.GEMINI_2
     raise ClientError(
         f"Unrecognized model family: {model!r}. "
-        "Expected 'gemini-2.*' or 'gemini-3.*'. Check your model name."
+        "Expected 'gemini-2.*', 'gemini-3.*', or a '-latest' alias."
     )
 
 
