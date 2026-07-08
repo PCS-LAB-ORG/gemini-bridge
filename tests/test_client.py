@@ -3,12 +3,12 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from gemini_bridge.client import ClientError, GeminiClient
+from gemini_bridge.client import _MAX_SESSIONS, DEFAULT_MODEL, ClientError, GeminiClient
 from gemini_bridge.config import Config
 
 
-def _make_client(model: str = "gemini-2.5-flash") -> GeminiClient:
-    config = Config(project="test-project", model=model)
+def _make_client() -> GeminiClient:
+    config = Config(project="test-project")
     mock_creds = MagicMock()
     with patch("google.genai.Client"):
         return GeminiClient(config, mock_creds)
@@ -43,58 +43,59 @@ class TestSessionManagement:
         sb = client.get_or_create_session("brainstorm:default")
         assert sa is not sb
 
-    def test_session_cache_evicts_oldest_when_full(self) -> None:
-        from gemini_bridge.client import _MAX_SESSIONS
+    def test_different_models_create_separate_sessions(self) -> None:
+        client = _make_client()
+        chat_a, chat_b = MagicMock(), MagicMock()
+        client._raw_client.chats.create.side_effect = [chat_a, chat_b]
 
+        sa = client.get_or_create_session("ask:default", model="gemini-2.5-flash")
+        sb = client.get_or_create_session("ask:default", model="gemini-2.5-pro")
+        assert sa is not sb
+
+    def test_session_cache_evicts_oldest_when_full(self) -> None:
         client = _make_client()
         client._raw_client.chats.create.return_value = MagicMock()
 
-        # Fill cache past max
         for i in range(_MAX_SESSIONS + 1):
             client.get_or_create_session(f"session:{i}")
 
         assert len(client._sessions) == _MAX_SESSIONS
-        assert "session:0" not in client._sessions  # oldest evicted
-        assert f"session:{_MAX_SESSIONS}" in client._sessions  # newest retained
+        assert "session:0:gemini-2.5-flash" not in client._sessions
+        assert f"session:{_MAX_SESSIONS}:{DEFAULT_MODEL}" in client._sessions
 
 
 class TestThinkingConfig:
     def test_gemini2_thinking_none_maps_to_budget_zero(self) -> None:
-        client = _make_client("gemini-2.5-flash")
-        config = client._build_generation_config("none")
+        client = _make_client()
+        config = client._build_generation_config("none", model="gemini-2.5-flash")
         assert config.thinking_config.thinking_budget == 0  # type: ignore[union-attr]
 
     def test_gemini2_thinking_high_maps_to_budget_32768(self) -> None:
-        client = _make_client("gemini-2.5-pro")
-        config = client._build_generation_config("high")
+        client = _make_client()
+        config = client._build_generation_config("high", model="gemini-2.5-pro")
         assert config.thinking_config.thinking_budget == 32768  # type: ignore[union-attr]
-
-    def test_gemini2_pro_thinking_none_clamped_to_minimum(self) -> None:
-        client = _make_client("gemini-2.5-pro")
-        config = client._build_generation_config("none")
-        # Pro models reject budget=0; must be clamped to 128
-        assert config.thinking_config.thinking_budget == 128  # type: ignore[union-attr]
-
-    def test_gemini2_flash_thinking_none_stays_zero(self) -> None:
-        client = _make_client("gemini-2.5-flash")
-        config = client._build_generation_config("none")
-        assert config.thinking_config.thinking_budget == 0  # type: ignore[union-attr]
 
     def test_gemini3_thinking_maps_to_level_enum(self) -> None:
         from google.genai.types import ThinkingLevel as SDKThinkingLevel
 
-        client = _make_client("gemini-3.5-flash")
-        config = client._build_generation_config("medium")
+        client = _make_client()
+        config = client._build_generation_config("medium", model="gemini-3.5-flash")
         assert config.thinking_config.thinking_level == SDKThinkingLevel.MEDIUM  # type: ignore[union-attr]
 
     def test_unknown_model_family_raises_client_error(self) -> None:
         client = _make_client()
-        # Bypass pydantic validation to simulate a bad model that passed config validation
-        client._config = Config.model_construct(
-            project="p", model="gpt-4-bad", default_thinking="medium"
-        )
         with pytest.raises(ClientError, match="Unrecognized model family"):
-            client._build_generation_config("low")
+            client._build_generation_config("low", model="gpt-4-bad")
+
+    def test_gemini2_pro_thinking_none_clamped_to_minimum(self) -> None:
+        client = _make_client()
+        config = client._build_generation_config("none", model="gemini-2.5-pro")
+        assert config.thinking_config.thinking_budget == 128  # type: ignore[union-attr]
+
+    def test_gemini2_flash_thinking_none_stays_zero(self) -> None:
+        client = _make_client()
+        config = client._build_generation_config("none", model="gemini-2.5-flash")
+        assert config.thinking_config.thinking_budget == 0  # type: ignore[union-attr]
 
 
 class TestAsk:
@@ -124,7 +125,7 @@ class TestAsk:
         mock_session = MagicMock()
         mock_response = MagicMock()
         mock_response.text = ""
-        mock_response.candidates = []  # no candidates at all
+        mock_response.candidates = []
         mock_session.send_message.return_value = mock_response
 
         with pytest.raises(ClientError, match="finish_reason=UNKNOWN"):

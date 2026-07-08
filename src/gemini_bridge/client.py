@@ -5,7 +5,7 @@ Gemini chat session manager and unified ask() interface.
 
 Responsibilities:
   - Build the google-genai Client from credentials and config
-  - Create and cache named Chat sessions (one per name, keyed by session_name)
+  - Create and cache named Chat sessions (one per tool+session+model triple)
   - Translate named thinking levels to model-appropriate API parameters
   - Expose ask() as the single interface all tools use
 
@@ -38,6 +38,9 @@ from google.genai.types import ThinkingLevel as SDKThinkingLevel
 
 from gemini_bridge.config import Config, ModelFamily, ThinkingLevel
 
+# Default model used when a tool call does not specify one.
+DEFAULT_MODEL = "gemini-2.5-flash"
+
 # Thinking budget token counts for Gemini 2.x models
 _THINKING_BUDGET_2X: dict[str, int] = {
     "none": 0,
@@ -56,7 +59,6 @@ _THINKING_LEVEL_3X: dict[str, SDKThinkingLevel] = {
     "high": SDKThinkingLevel.HIGH,
 }
 
-
 _MAX_SESSIONS = 50  # LRU cap; oldest session evicted when exceeded
 _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 1.0  # seconds; doubles each attempt plus jitter
@@ -65,6 +67,18 @@ _RETRY_BASE_DELAY = 1.0  # seconds; doubles each attempt plus jitter
 def _is_retryable(exc: Exception) -> bool:
     msg = str(exc).upper()
     return any(token in msg for token in ("503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED"))
+
+
+def _model_family(model: str) -> ModelFamily:
+    """Resolve model string to ModelFamily. Raises ClientError for unrecognized names."""
+    if model.startswith("gemini-2."):
+        return ModelFamily.GEMINI_2
+    if model.startswith("gemini-3."):
+        return ModelFamily.GEMINI_3
+    raise ClientError(
+        f"Unrecognized model family: {model!r}. "
+        "Expected 'gemini-2.*' or 'gemini-3.*'. Check your model name."
+    )
 
 
 class ClientError(Exception):
@@ -90,22 +104,29 @@ class GeminiClient:
                 location=config.location,
                 credentials=credentials,
             )
+        # Keyed by "{name}:{model}" — sessions are model-specific
         self._sessions: OrderedDict[str, Chat] = OrderedDict()
 
     def get_or_create_session(
         self,
         name: str = "default",
         system_instruction: Optional[str] = None,
+        model: Optional[str] = None,
     ) -> Chat:
-        """Return existing chat session or create a new one (LRU-capped at _MAX_SESSIONS)."""
-        if name in self._sessions:
-            self._sessions.move_to_end(name)
-            return self._sessions[name]
+        """Return existing chat session or create a new one (LRU-capped at _MAX_SESSIONS).
+
+        Sessions are keyed by (name, model) — changing the model creates a new session.
+        """
+        effective_model = model or DEFAULT_MODEL
+        cache_key = f"{name}:{effective_model}"
+        if cache_key in self._sessions:
+            self._sessions.move_to_end(cache_key)
+            return self._sessions[cache_key]
         cfg: Optional[GenerateContentConfig] = None
         if system_instruction:
             cfg = GenerateContentConfig(system_instruction=system_instruction)
-        session = self._raw_client.chats.create(model=self._config.model, config=cfg)
-        self._sessions[name] = session
+        session = self._raw_client.chats.create(model=effective_model, config=cfg)
+        self._sessions[cache_key] = session
         if len(self._sessions) > _MAX_SESSIONS:
             evicted, _ = self._sessions.popitem(last=False)
             _log.debug("session cache evicted (LRU): %s", evicted)
@@ -119,19 +140,18 @@ class GeminiClient:
         self,
         thinking: ThinkingLevel,
         system_instruction: Optional[str] = None,
+        model: Optional[str] = None,
     ) -> GenerateContentConfig:
+        effective_model = model or DEFAULT_MODEL
         si = {"system_instruction": system_instruction} if system_instruction else {}
-        try:
-            family = self._config.model_family
-        except ValueError as exc:
-            raise ClientError(str(exc)) from exc
+        family = _model_family(effective_model)
         if family == ModelFamily.GEMINI_2:
             budget = _THINKING_BUDGET_2X[thinking]
-            if "pro" in self._config.model and budget < _THINKING_BUDGET_2X_PRO_MIN:
+            if "pro" in effective_model and budget < _THINKING_BUDGET_2X_PRO_MIN:
                 _log.debug(
                     "thinking=none clamped to %d for Pro model %r",
                     _THINKING_BUDGET_2X_PRO_MIN,
-                    self._config.model,
+                    effective_model,
                 )
                 budget = _THINKING_BUDGET_2X_PRO_MIN
             return GenerateContentConfig(
@@ -144,8 +164,8 @@ class GeminiClient:
                 **si,
             )
         raise ClientError(
-            f"Unrecognized model family: {self._config.model!r}. "
-            "Expected 'gemini-2.*' or 'gemini-3.*'. Update config.json."
+            f"Unrecognized model family: {effective_model!r}. "
+            "Expected 'gemini-2.*' or 'gemini-3.*'. Check your model name."
         )
 
     def ask(
@@ -154,11 +174,17 @@ class GeminiClient:
         prompt: str,
         thinking: Optional[ThinkingLevel] = None,
         system_instruction: Optional[str] = None,
+        model: Optional[str] = None,
     ) -> str:
         """Send prompt to chat session, return response text. Raises ClientError on failure."""
         effective_thinking: ThinkingLevel = thinking or self._config.default_thinking
-        gen_config = self._build_generation_config(effective_thinking, system_instruction)
-        _log.debug("ask: thinking=%s prompt_len=%d", effective_thinking, len(prompt))
+        gen_config = self._build_generation_config(effective_thinking, system_instruction, model)
+        _log.debug(
+            "ask: model=%s thinking=%s prompt_len=%d",
+            model or DEFAULT_MODEL,
+            effective_thinking,
+            len(prompt),
+        )
         for attempt in range(1, _MAX_RETRIES + 2):
             try:
                 response = session.send_message(prompt, config=gen_config)
