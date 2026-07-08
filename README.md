@@ -6,7 +6,7 @@
   <img alt="MCP" src="https://img.shields.io/badge/MCP-1.28-green.svg">
   <img alt="Vertex AI" src="https://img.shields.io/badge/Vertex%20AI-Gemini-orange.svg">
   <img alt="Auth" src="https://img.shields.io/badge/auth-ADC%20%7C%20env%20%7C%20Keychain%20%7C%20API%20key-purple.svg">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-99%20passing-brightgreen.svg">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-105%20passing-brightgreen.svg">
 </p>
 
 gemini-bridge is an MCP server that gives Claude Code a live Gemini counterpart. When Claude is working on a hard problem — an architectural decision, a tricky bug, a code review — it can consult Gemini as a second opinion without switching tools or context.
