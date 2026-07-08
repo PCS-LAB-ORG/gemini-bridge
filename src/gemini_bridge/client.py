@@ -36,7 +36,7 @@ from google.genai.chats import Chat
 from google.genai.types import GenerateContentConfig, ThinkingConfig
 from google.genai.types import ThinkingLevel as SDKThinkingLevel
 
-from gemini_bridge.config import Config, ThinkingLevel
+from gemini_bridge.config import Config, ModelFamily, ThinkingLevel
 
 # Thinking budget token counts for Gemini 2.x models
 _THINKING_BUDGET_2X: dict[str, int] = {
@@ -118,20 +118,23 @@ class GeminiClient:
         thinking: ThinkingLevel,
         system_instruction: Optional[str] = None,
     ) -> GenerateContentConfig:
-        model = self._config.model
         si = {"system_instruction": system_instruction} if system_instruction else {}
-        if model.startswith("gemini-2."):
+        try:
+            family = self._config.model_family
+        except ValueError as exc:
+            raise ClientError(str(exc)) from exc
+        if family == ModelFamily.GEMINI_2:
             return GenerateContentConfig(
                 thinking_config=ThinkingConfig(thinking_budget=_THINKING_BUDGET_2X[thinking]),
                 **si,
             )
-        if model.startswith("gemini-3."):
+        if family == ModelFamily.GEMINI_3:
             return GenerateContentConfig(
                 thinking_config=ThinkingConfig(thinking_level=_THINKING_LEVEL_3X[thinking]),
                 **si,
             )
         raise ClientError(
-            f"Unrecognized model family: {model!r}. "
+            f"Unrecognized model family: {self._config.model!r}. "
             "Expected 'gemini-2.*' or 'gemini-3.*'. Update config.json."
         )
 
