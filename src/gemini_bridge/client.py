@@ -69,6 +69,28 @@ def _is_retryable(exc: Exception) -> bool:
     return any(token in msg for token in ("503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED"))
 
 
+def _warn_model_backend_mismatch(model: str, is_vertex: bool) -> None:
+    """Log a warning when the model name looks mismatched with the active backend.
+
+    Developer API (api_key): uses unversioned aliases like 'gemini-2.5-flash'.
+    Vertex AI: uses versioned IDs like 'gemini-2.0-flash-001' or stable aliases;
+               gemini-3.x previews may not be available and will 404.
+    """
+    if not is_vertex and model.startswith("gemini-3."):
+        _log.warning(
+            "model %r is a Gemini 3.x preview — availability via Google AI Studio API "
+            "keys varies. If you get 404/503, try 'gemini-2.5-flash' instead.",
+            model,
+        )
+    elif is_vertex and "-latest" in model:
+        _log.warning(
+            "model %r uses a '-latest' alias, which is a Developer API convention. "
+            "Vertex AI uses versioned IDs (e.g. 'gemini-2.0-flash-001'). "
+            "This may 404 on the Vertex endpoint.",
+            model,
+        )
+
+
 def _model_family(model: str) -> ModelFamily:
     """Resolve model string to ModelFamily. Raises ClientError for unrecognized names."""
     if model.startswith("gemini-2."):
@@ -104,6 +126,7 @@ class GeminiClient:
                 location=config.location,
                 credentials=credentials,
             )
+        self._is_vertex = api_key is None
         # Keyed by "{name}:{model}" — sessions are model-specific
         self._sessions: OrderedDict[str, Chat] = OrderedDict()
 
@@ -118,6 +141,7 @@ class GeminiClient:
         Sessions are keyed by (name, model) — changing the model creates a new session.
         """
         effective_model = model or DEFAULT_MODEL
+        _warn_model_backend_mismatch(effective_model, self._is_vertex)
         cache_key = f"{name}:{effective_model}"
         if cache_key in self._sessions:
             self._sessions.move_to_end(cache_key)
