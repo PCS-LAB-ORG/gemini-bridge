@@ -26,7 +26,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Literal, Optional
 
-from pydantic import BaseModel, computed_field, field_validator, model_validator
+from pydantic import BaseModel, model_validator
 
 CONFIG_PATH: Path = Path.home() / ".config" / "gemini-bridge" / "config.json"
 
@@ -35,7 +35,7 @@ AuthMethod = Literal["adc", "env", "keychain", "api_key"]
 
 
 class ModelFamily(str, Enum):
-    """Resolved model generation family — drives thinking-API selection in client.py."""
+    """Model generation family — drives thinking-API selection in client.py."""
 
     GEMINI_2 = "gemini-2"
     GEMINI_3 = "gemini-3"
@@ -66,29 +66,9 @@ class AuthConfig(BaseModel):
 class Config(BaseModel):
     project: Optional[str] = None  # required for adc/env/keychain; unused for api_key
     location: str = "global"
-    model: str = "gemini-2.5-flash"
     default_thinking: ThinkingLevel = "medium"
     transcript_dir: str = "./session-summaries"
     auth: AuthConfig = AuthConfig()
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def model_family(self) -> ModelFamily:
-        """Resolved once per config access; drives thinking-API selection in client.py."""
-        if self.model.startswith("gemini-2."):
-            return ModelFamily.GEMINI_2
-        if self.model.startswith("gemini-3."):
-            return ModelFamily.GEMINI_3
-        raise ValueError(f"Unrecognized model family: {self.model!r}")
-
-    @field_validator("model")
-    @classmethod
-    def model_family_recognized(cls, v: str) -> str:
-        if not (v.startswith("gemini-2.") or v.startswith("gemini-3.")):
-            raise ValueError(
-                f"Unrecognized model family: {v!r}. Expected 'gemini-2.*' or 'gemini-3.*'."
-            )
-        return v
 
     @model_validator(mode="after")
     def project_required_for_vertex(self) -> "Config":
@@ -96,17 +76,6 @@ class Config(BaseModel):
             raise ValueError(
                 "'project' is required for Vertex AI auth methods (adc, env, keychain). "
                 "Add it to config.json or switch to method='api_key'."
-            )
-        return self
-
-    @model_validator(mode="after")
-    def location_compatible_with_model(self) -> "Config":
-        if self.auth.method == "api_key":
-            return self  # location is unused in Developer API mode
-        if self.model.startswith("gemini-3.") and self.location != "global":
-            raise ValueError(
-                f"Model {self.model!r} only supports location='global' on Vertex AI. "
-                "Remove the location field or set it to 'global'."
             )
         return self
 

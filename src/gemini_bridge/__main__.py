@@ -108,21 +108,21 @@ def main() -> None:
         _log.error("startup failed — auth error: %s", exc)
         sys.exit(1)
 
+    from gemini_bridge.client import DEFAULT_MODEL
+
     if config.auth.method == "api_key":
-        _log.info("starting — auth=api_key model=%s", config.model)
-        if config.model.startswith("gemini-3."):
-            _log.warning(
-                "model %r is a Gemini 3.x preview — availability via Google AI Studio API "
-                "keys varies. If you see 404 or 503 errors, switch to gemini-2.5-flash in "
-                "config.json (Vertex AI auth supports a broader 3.x catalog).",
-                config.model,
-            )
+        _log.info(
+            "starting — auth=api_key default_thinking=%s default_model=%s",
+            config.default_thinking,
+            DEFAULT_MODEL,
+        )
     else:
         _log.info(
-            "starting — auth=%s model=%s location=%s",
+            "starting — auth=%s location=%s default_thinking=%s default_model=%s",
             config.auth.method,
-            config.model,
             config.location,
+            config.default_thinking,
+            DEFAULT_MODEL,
         )
 
     client = GeminiClient(config, credentials=auth_result.credentials, api_key=auth_result.api_key)

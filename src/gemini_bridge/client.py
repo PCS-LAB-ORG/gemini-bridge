@@ -5,7 +5,7 @@ Gemini chat session manager and unified ask() interface.
 
 Responsibilities:
   - Build the google-genai Client from credentials and config
-  - Create and cache named Chat sessions (one per name, keyed by session_name)
+  - Create and cache named Chat sessions (one per tool+session+model triple)
   - Translate named thinking levels to model-appropriate API parameters
   - Expose ask() as the single interface all tools use
 
@@ -38,6 +38,11 @@ from google.genai.types import ThinkingLevel as SDKThinkingLevel
 
 from gemini_bridge.config import Config, ModelFamily, ThinkingLevel
 
+# Default model used when a tool call does not specify one.
+DEFAULT_MODEL = "gemini-2.5-flash"
+# Stable fallback model used when the requested model returns a terminal 503/429.
+FALLBACK_MODEL = "gemini-2.5-flash"
+
 # Thinking budget token counts for Gemini 2.x models
 _THINKING_BUDGET_2X: dict[str, int] = {
     "none": 0,
@@ -56,7 +61,6 @@ _THINKING_LEVEL_3X: dict[str, SDKThinkingLevel] = {
     "high": SDKThinkingLevel.HIGH,
 }
 
-
 _MAX_SESSIONS = 50  # LRU cap; oldest session evicted when exceeded
 _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 1.0  # seconds; doubles each attempt plus jitter
@@ -65,6 +69,52 @@ _RETRY_BASE_DELAY = 1.0  # seconds; doubles each attempt plus jitter
 def _is_retryable(exc: Exception) -> bool:
     msg = str(exc).upper()
     return any(token in msg for token in ("503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED"))
+
+
+def _warn_model_backend_mismatch(model: str, is_vertex: bool) -> None:
+    """Log a warning when the model name looks mismatched with the active backend.
+
+    Developer API (api_key): uses unversioned aliases like 'gemini-2.5-flash'.
+    Vertex AI: uses versioned IDs like 'gemini-2.0-flash-001' or stable aliases;
+               gemini-3.x previews may not be available and will 404.
+    """
+    if not is_vertex and model.startswith("gemini-3."):
+        _log.warning(
+            "model %r is a Gemini 3.x preview — availability via Google AI Studio API "
+            "keys varies. If you get 404/503, try 'gemini-2.5-flash' instead.",
+            model,
+        )
+    elif is_vertex and "-latest" in model:
+        _log.warning(
+            "model %r uses a '-latest' alias, which is a Developer API convention. "
+            "Vertex AI uses versioned IDs (e.g. 'gemini-2.0-flash-001'). "
+            "This may 404 on the Vertex endpoint.",
+            model,
+        )
+
+
+def _model_family(model: str) -> ModelFamily:
+    """Resolve model string to ModelFamily. Raises ClientError for unrecognized names.
+
+    '-latest' aliases (gemini-flash-latest, gemini-pro-latest, etc.) are accepted and
+    treated as GEMINI_2 — they currently resolve to 2.x-generation models on the
+    Developer API. A debug log notes the assumption so it's visible if behavior changes.
+    """
+    if model.startswith("gemini-2."):
+        return ModelFamily.GEMINI_2
+    if model.startswith("gemini-3."):
+        return ModelFamily.GEMINI_3
+    if model.endswith("-latest") or "-latest-" in model:
+        _log.debug(
+            "model %r uses a '-latest' alias; assuming GEMINI_2 thinking-config. "
+            "If thinking-config errors occur, specify a versioned model instead.",
+            model,
+        )
+        return ModelFamily.GEMINI_2
+    raise ClientError(
+        f"Unrecognized model family: {model!r}. "
+        "Expected 'gemini-2.*', 'gemini-3.*', or a '-latest' alias."
+    )
 
 
 class ClientError(Exception):
@@ -90,22 +140,31 @@ class GeminiClient:
                 location=config.location,
                 credentials=credentials,
             )
+        self._is_vertex = api_key is None
+        # Keyed by "{name}:{model}" — sessions are model-specific
         self._sessions: OrderedDict[str, Chat] = OrderedDict()
 
     def get_or_create_session(
         self,
         name: str = "default",
         system_instruction: Optional[str] = None,
+        model: Optional[str] = None,
     ) -> Chat:
-        """Return existing chat session or create a new one (LRU-capped at _MAX_SESSIONS)."""
-        if name in self._sessions:
-            self._sessions.move_to_end(name)
-            return self._sessions[name]
+        """Return existing chat session or create a new one (LRU-capped at _MAX_SESSIONS).
+
+        Sessions are keyed by (name, model) — changing the model creates a new session.
+        """
+        effective_model = model or DEFAULT_MODEL
+        _warn_model_backend_mismatch(effective_model, self._is_vertex)
+        cache_key = f"{name}:{effective_model}"
+        if cache_key in self._sessions:
+            self._sessions.move_to_end(cache_key)
+            return self._sessions[cache_key]
         cfg: Optional[GenerateContentConfig] = None
         if system_instruction:
             cfg = GenerateContentConfig(system_instruction=system_instruction)
-        session = self._raw_client.chats.create(model=self._config.model, config=cfg)
-        self._sessions[name] = session
+        session = self._raw_client.chats.create(model=effective_model, config=cfg)
+        self._sessions[cache_key] = session
         if len(self._sessions) > _MAX_SESSIONS:
             evicted, _ = self._sessions.popitem(last=False)
             _log.debug("session cache evicted (LRU): %s", evicted)
@@ -119,19 +178,18 @@ class GeminiClient:
         self,
         thinking: ThinkingLevel,
         system_instruction: Optional[str] = None,
+        model: Optional[str] = None,
     ) -> GenerateContentConfig:
+        effective_model = model or DEFAULT_MODEL
         si = {"system_instruction": system_instruction} if system_instruction else {}
-        try:
-            family = self._config.model_family
-        except ValueError as exc:
-            raise ClientError(str(exc)) from exc
+        family = _model_family(effective_model)
         if family == ModelFamily.GEMINI_2:
             budget = _THINKING_BUDGET_2X[thinking]
-            if "pro" in self._config.model and budget < _THINKING_BUDGET_2X_PRO_MIN:
+            if "pro" in effective_model and budget < _THINKING_BUDGET_2X_PRO_MIN:
                 _log.debug(
                     "thinking=none clamped to %d for Pro model %r",
                     _THINKING_BUDGET_2X_PRO_MIN,
-                    self._config.model,
+                    effective_model,
                 )
                 budget = _THINKING_BUDGET_2X_PRO_MIN
             return GenerateContentConfig(
@@ -144,8 +202,8 @@ class GeminiClient:
                 **si,
             )
         raise ClientError(
-            f"Unrecognized model family: {self._config.model!r}. "
-            "Expected 'gemini-2.*' or 'gemini-3.*'. Update config.json."
+            f"Unrecognized model family: {effective_model!r}. "
+            "Expected 'gemini-2.*' or 'gemini-3.*'. Check your model name."
         )
 
     def ask(
@@ -154,11 +212,17 @@ class GeminiClient:
         prompt: str,
         thinking: Optional[ThinkingLevel] = None,
         system_instruction: Optional[str] = None,
+        model: Optional[str] = None,
     ) -> str:
         """Send prompt to chat session, return response text. Raises ClientError on failure."""
         effective_thinking: ThinkingLevel = thinking or self._config.default_thinking
-        gen_config = self._build_generation_config(effective_thinking, system_instruction)
-        _log.debug("ask: thinking=%s prompt_len=%d", effective_thinking, len(prompt))
+        gen_config = self._build_generation_config(effective_thinking, system_instruction, model)
+        _log.debug(
+            "ask: model=%s thinking=%s prompt_len=%d",
+            model or DEFAULT_MODEL,
+            effective_thinking,
+            len(prompt),
+        )
         for attempt in range(1, _MAX_RETRIES + 2):
             try:
                 response = session.send_message(prompt, config=gen_config)
@@ -178,7 +242,14 @@ class GeminiClient:
                 else:
                     suffix = f" after {attempt} attempt(s)" if attempt > 1 else ""
                     _log.error("inference failed%s: %s", suffix, exc)
-                    raise ClientError(f"Gemini inference failed{suffix}: {exc}") from exc
+                    hint = ""
+                    if _is_retryable(exc):
+                        hint = (
+                            " The model appears overloaded or quota-limited. "
+                            "Try again shortly, or pass a different model "
+                            "(e.g. model='gemini-2.5-flash') to avoid the busy endpoint."
+                        )
+                    raise ClientError(f"Gemini inference failed{suffix}: {exc}{hint}") from exc
         if not response.text:
             finish_reason = "UNKNOWN"
             try:

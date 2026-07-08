@@ -28,7 +28,6 @@ ask() {
 # Variables set here are used as prompt defaults throughout the wizard.
 PREV_AUTH_METHOD="adc"
 PREV_PROJECT=""
-PREV_MODEL="gemini-2.5-flash"
 PREV_LOCATION="global"
 PREV_THINKING="medium"
 PREV_TRANSCRIPT_DIR="./session-summaries"
@@ -46,7 +45,6 @@ try:
     fields = [
         ('PREV_AUTH_METHOD',      auth.get('method', 'adc')),
         ('PREV_PROJECT',          d.get('project', '')),
-        ('PREV_MODEL',            d.get('model', 'gemini-2.5-flash')),
         ('PREV_LOCATION',         d.get('location', 'global')),
         ('PREV_THINKING',         d.get('default_thinking', 'medium')),
         ('PREV_TRANSCRIPT_DIR',   d.get('transcript_dir', './session-summaries')),
@@ -59,15 +57,6 @@ except Exception:
     pass
 " "$CONFIG_FILE" 2>/dev/null || true)"
 fi
-
-# Map existing model string to menu choice number for the prompt default
-case "$PREV_MODEL" in
-    "gemini-2.5-flash")       PREV_MODEL_CHOICE="1" ;;
-    "gemini-2.5-pro")         PREV_MODEL_CHOICE="2" ;;
-    "gemini-3.5-flash")       PREV_MODEL_CHOICE="3" ;;
-    "gemini-3.1-pro-preview") PREV_MODEL_CHOICE="4" ;;
-    *)                        PREV_MODEL_CHOICE="1" ;;
-esac
 
 # Map existing auth method to menu choice number
 case "$PREV_AUTH_METHOD" in
@@ -211,36 +200,15 @@ PROJECT=$(ask "GCP project" "$DEFAULT_PROJECT")
 [[ -z "$PROJECT" ]] && error "GCP project is required."
 fi
 
-# --- model (before location — location options depend on model family) ---
-echo
-echo "Model:"
-echo "  1) gemini-2.5-flash        — fast, cheap (recommended)"
-echo "  2) gemini-2.5-pro          — more capable"
-echo "  3) gemini-3.5-flash        — newest Flash (global endpoint only)"
-echo "  4) gemini-3.1-pro-preview  — newest Pro, preview (global endpoint only)"
-MODEL_CHOICE=$(ask "Choice" "$PREV_MODEL_CHOICE")
-case "$MODEL_CHOICE" in
-    1) MODEL="gemini-2.5-flash" ;;
-    2) MODEL="gemini-2.5-pro" ;;
-    3) MODEL="gemini-3.5-flash" ;;
-    4) MODEL="gemini-3.1-pro-preview" ;;
-    *) error "Invalid choice: $MODEL_CHOICE" ;;
-esac
-
-# --- location (skipped for api_key mode; gemini-3.x is global-only) ---
+# --- location (Vertex only; api_key uses Developer API endpoint, location unused) ---
 LOCATION="global"
 if [[ "$AUTH_METHOD" != "api_key" ]]; then
     echo
-    if [[ "$MODEL" == gemini-3.* ]]; then
-        LOCATION="global"
-        info "Location: global (required for $MODEL)"
-    else
-        echo "Location (gemini-2.x supports 'global' or a specific region):"
-        echo "  global — recommended; routes to lowest-latency region automatically"
-        echo "  us-central1, us-east4, europe-west1, asia-northeast1, etc."
-        LOCATION=$(ask "Location" "$PREV_LOCATION")
-        [[ -z "$LOCATION" ]] && error "Location is required."
-    fi
+    echo "Location (Vertex AI endpoint; 'global' is recommended and works for all models):"
+    echo "  global — recommended; routes to lowest-latency region automatically"
+    echo "  us-central1, us-east4, europe-west1, asia-northeast1, etc."
+    LOCATION=$(ask "Location" "$PREV_LOCATION")
+    [[ -z "$LOCATION" ]] && error "Location is required."
 fi
 
 # --- thinking level ---
@@ -281,11 +249,10 @@ else
   }"
 fi
 
-# api_key mode: project and location are not needed
+# api_key mode: project and location are not needed (Developer API endpoint)
 if [[ "$AUTH_METHOD" == "api_key" ]]; then
 cat > "$CONFIG_FILE" <<EOF
 {
-  "model": "$MODEL",
   "default_thinking": "$THINKING",
   "transcript_dir": "$TRANSCRIPT_DIR",
   $AUTH_JSON
@@ -296,7 +263,6 @@ cat > "$CONFIG_FILE" <<EOF
 {
   "project": "$PROJECT",
   "location": "$LOCATION",
-  "model": "$MODEL",
   "default_thinking": "$THINKING",
   "transcript_dir": "$TRANSCRIPT_DIR",
   $AUTH_JSON
