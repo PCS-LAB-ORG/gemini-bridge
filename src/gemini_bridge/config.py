@@ -22,15 +22,23 @@ Imports:  (stdlib + pydantic only)
 """
 
 import json
+from enum import Enum
 from pathlib import Path
 from typing import Literal, Optional
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, computed_field, field_validator, model_validator
 
 CONFIG_PATH: Path = Path.home() / ".config" / "gemini-bridge" / "config.json"
 
 ThinkingLevel = Literal["none", "low", "medium", "high"]
 AuthMethod = Literal["adc", "env", "keychain", "api_key"]
+
+
+class ModelFamily(str, Enum):
+    """Resolved model generation family — drives thinking-API selection in client.py."""
+
+    GEMINI_2 = "gemini-2"
+    GEMINI_3 = "gemini-3"
 
 
 class ConfigError(Exception):
@@ -62,6 +70,16 @@ class Config(BaseModel):
     default_thinking: ThinkingLevel = "medium"
     transcript_dir: str = "./session-summaries"
     auth: AuthConfig = AuthConfig()
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def model_family(self) -> ModelFamily:
+        """Resolved once per config access; drives thinking-API selection in client.py."""
+        if self.model.startswith("gemini-2."):
+            return ModelFamily.GEMINI_2
+        if self.model.startswith("gemini-3."):
+            return ModelFamily.GEMINI_3
+        raise ValueError(f"Unrecognized model family: {self.model!r}")
 
     @field_validator("model")
     @classmethod

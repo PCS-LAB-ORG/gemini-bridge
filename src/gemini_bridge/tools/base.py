@@ -50,10 +50,10 @@ def call_gemini(
         name=f"{tool_name}:{session_name}",
         system_instruction=system_instruction,
     )
-    effective_thinking: ThinkingLevel = thinking or client._config.default_thinking
+    effective_thinking: ThinkingLevel = thinking or client.default_thinking
     _log.debug("%s session=%r thinking=%s", tool_name, session_name, effective_thinking)
     try:
-        response = client.ask(session, prompt, thinking)
+        response = client.ask(session, prompt, thinking, system_instruction=system_instruction)
     except ClientError as exc:
         _log.error("%s session=%r failed: %s", tool_name, session_name, exc)
         return f"[gemini-bridge error] {exc}"
