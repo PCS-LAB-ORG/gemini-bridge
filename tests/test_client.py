@@ -88,9 +88,21 @@ class TestAsk:
         mock_session = MagicMock()
         mock_response = MagicMock()
         mock_response.text = ""
+        mock_response.candidates[0].finish_reason.name = "SAFETY"
         mock_session.send_message.return_value = mock_response
 
-        with pytest.raises(ClientError, match="empty response"):
+        with pytest.raises(ClientError, match="finish_reason=SAFETY"):
+            client.ask(mock_session, "Hello", "low")
+
+    def test_ask_empty_response_unknown_finish_reason(self) -> None:
+        client = _make_client()
+        mock_session = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = ""
+        mock_response.candidates = []  # no candidates at all
+        mock_session.send_message.return_value = mock_response
+
+        with pytest.raises(ClientError, match="finish_reason=UNKNOWN"):
             client.ask(mock_session, "Hello", "low")
 
     def test_ask_raises_client_error_on_exception(self) -> None:
