@@ -109,7 +109,31 @@ class TestAsk:
         mock_session.send_message.return_value = mock_response
 
         client.ask(mock_session, "Hello", None)
-        # Verify send_message was called with a config object (thinking applied from config default)
         mock_session.send_message.assert_called_once()
         call_kwargs = mock_session.send_message.call_args
         assert call_kwargs is not None
+
+    def test_ask_passes_system_instruction_in_gen_config(self) -> None:
+        client = _make_client()
+        mock_session = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "ok"
+        mock_session.send_message.return_value = mock_response
+
+        client.ask(mock_session, "Hello", "low", system_instruction="You are a critic.")
+        _, kwargs = mock_session.send_message.call_args
+        assert kwargs["config"].system_instruction == "You are a critic."
+
+    def test_default_thinking_property(self) -> None:
+        client = _make_client()
+        assert client.default_thinking == "medium"
+
+    def test_build_generation_config_includes_system_instruction(self) -> None:
+        client = _make_client()
+        cfg = client._build_generation_config("low", system_instruction="Be concise.")
+        assert cfg.system_instruction == "Be concise."
+
+    def test_build_generation_config_no_system_instruction(self) -> None:
+        client = _make_client()
+        cfg = client._build_generation_config("low")
+        assert cfg.system_instruction is None
