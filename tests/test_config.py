@@ -160,3 +160,17 @@ def test_api_key_location_validator_skipped() -> None:
 def test_vertex_gemini3_non_global_still_rejected() -> None:
     with pytest.raises(Exception, match="only supports location"):
         Config(project="p", model="gemini-3.5-flash", location="us-central1")
+
+
+def test_model_family_gemini2() -> None:
+    from gemini_bridge.config import ModelFamily
+
+    cfg = Config(project="p", model="gemini-2.5-flash")
+    assert cfg.model_family == ModelFamily.GEMINI_2
+
+
+def test_model_family_gemini3() -> None:
+    from gemini_bridge.config import ModelFamily
+
+    cfg = Config(auth={"method": "api_key"}, model="gemini-3.5-flash")
+    assert cfg.model_family == ModelFamily.GEMINI_3
