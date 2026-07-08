@@ -136,14 +136,29 @@ def _load_keychain(auth_config: AuthConfig) -> google.auth.credentials.Credentia
     return service_account.Credentials.from_service_account_info(sa_info, scopes=_VERTEX_SCOPES)
 
 
+def _looks_like_api_key(value: str) -> bool:
+    """Return True if value looks like an API key rather than an env var name."""
+    return value.startswith("AIza") or not value.replace("_", "").isupper() or len(value) > 40
+
+
 def _load_api_key(auth_config: AuthConfig) -> str:
     """Read Gemini Developer API key from the configured env var. Raises AuthError if unset."""
     env_var = auth_config.api_key_env or "GEMINI_API_KEY"
+    if _looks_like_api_key(env_var):
+        _log.error("api_key_env looks like a key value, not a variable name")
+        raise AuthError(
+            "Gemini config error: 'api_key_env' in config.json contains what looks like "
+            "an API key, not an environment variable name.\n"
+            'Fix: set api_key_env to the variable name (e.g. "GEMINI_API_KEY"), '
+            "then export that variable:\n"
+            "  export GEMINI_API_KEY=<your-key>\n"
+            "Edit ~/.config/gemini-bridge/config.json or re-run setup.sh."
+        )
     key = os.environ.get(env_var, "").strip()
     if not key:
         _log.error("api_key env var not set or empty: %s", env_var)
         raise AuthError(
-            f"Gemini auth error: {env_var!r} is not set or is empty.\n"
+            f"Gemini auth error: env var {env_var!r} is not set or is empty.\n"
             f"Fix: export {env_var}=<your-Google-AI-Studio-key>\n"
             "Get a key at: https://aistudio.google.com/apikey"
         )

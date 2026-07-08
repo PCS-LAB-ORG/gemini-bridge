@@ -166,8 +166,10 @@ fi
 API_KEY_ENV="GEMINI_API_KEY"
 if [[ "$AUTH_METHOD" == "api_key" ]]; then
     echo
-    echo "The API key is read from an environment variable at server startup."
     echo "Get a key at: https://aistudio.google.com/apikey"
+    echo
+    echo "Enter the NAME of the environment variable that will hold your API key."
+    echo "  >>> Do NOT paste the key here — enter a variable name like GEMINI_API_KEY <<<"
     PREV_API_KEY_ENV=$(python3 -c "
 import json, pathlib, sys
 p = pathlib.Path('$CONFIG_FILE')
@@ -177,8 +179,19 @@ if p.exists():
 else:
     print('GEMINI_API_KEY')
 " 2>/dev/null || echo "GEMINI_API_KEY")
-    API_KEY_ENV=$(ask "API key env var name" "$PREV_API_KEY_ENV")
-    [[ -z "$API_KEY_ENV" ]] && API_KEY_ENV="GEMINI_API_KEY"
+    # Validate: must look like an env var name — uppercase/underscores, not an API key
+    while true; do
+        API_KEY_ENV=$(ask "Env var name (e.g. GEMINI_API_KEY)" "$PREV_API_KEY_ENV")
+        [[ -z "$API_KEY_ENV" ]] && API_KEY_ENV="GEMINI_API_KEY"
+        # Reject if it looks like an actual key: starts with AIza, contains lowercase, or is very long
+        if [[ "$API_KEY_ENV" =~ ^AIza ]] || [[ "$API_KEY_ENV" =~ [a-z] ]] || [[ ${#API_KEY_ENV} -gt 40 ]]; then
+            warn "That looks like an API key value, not a variable name."
+            echo "  Enter a variable name like GEMINI_API_KEY, not the key itself."
+            PREV_API_KEY_ENV="GEMINI_API_KEY"
+            continue
+        fi
+        break
+    done
     if [[ -z "${!API_KEY_ENV:-}" ]]; then
         warn "$API_KEY_ENV is not set in this shell."
         echo "  Set it before starting Claude Code, or pass it via MCP env config:"
