@@ -1,8 +1,17 @@
 # Tools Reference
 
-All 5 tools share two optional parameters:
+Six tools: five inference tools (`gemini_ask`, `gemini_brainstorm`, `gemini_review`,
+`gemini_debug`, `gemini_architect`) and one discovery utility (`gemini_list_models`).
+
+The five inference tools share three optional parameters:
 - `thinking: "none" | "low" | "medium" | "high"` — reasoning depth; falls back to `default_thinking` in config
 - `session_name: str` — session identifier; v1 always uses the default session per tool
+- `model: str` — Gemini model id; omit for the server default (`gemini-3.5-flash`). The
+  parameter's description is **backend-aware** (it lists the models valid for your active
+  backend). Sessions are keyed by tool + `session_name` + `model`, so switching model starts a
+  fresh session. Call [`gemini_list_models`](#gemini_list_models) to discover valid values, and
+  see [configuration.md](configuration.md#choosing-a-model) for the recommended set and fallback
+  behavior.
 
 ---
 
@@ -20,6 +29,7 @@ All 5 tools share two optional parameters:
 | `prompt` | string | yes | The question or request |
 | `thinking` | string | no | Reasoning depth |
 | `session_name` | string | no | Session identifier (default: `"default"`) |
+| `model` | string | no | Gemini model id; omit for the server default (`gemini-3.5-flash`) |
 
 **When to use:**
 - Direct questions with clear answers
@@ -49,6 +59,7 @@ gemini_ask(prompt="What's the difference between asyncio.gather and asyncio.wait
 | `context` | string | no | What Claude is currently doing or has considered |
 | `thinking` | string | no | Reasoning depth |
 | `session_name` | string | no | Session identifier |
+| `model` | string | no | Gemini model id; omit for the server default (`gemini-3.5-flash`) |
 
 **When to use:**
 - Design decisions where you want a second take
@@ -81,6 +92,7 @@ gemini_brainstorm(
 | `question` | string | no | Specific question to focus the review |
 | `thinking` | string | no | Reasoning depth |
 | `session_name` | string | no | Session identifier |
+| `model` | string | no | Gemini model id; omit for the server default (`gemini-3.5-flash`) |
 
 **When to use:**
 - Code review before merging
@@ -113,6 +125,7 @@ gemini_review(
 | `context` | string | no | Relevant code, recent changes, environment details |
 | `thinking` | string | no | Reasoning depth (use `high` for complex failures) |
 | `session_name` | string | no | Session identifier |
+| `model` | string | no | Gemini model id; omit for the server default (`gemini-3.5-flash`) |
 
 **When to use:**
 - Unexplained test failures
@@ -146,6 +159,7 @@ gemini_debug(
 | `question` | string | no | Specific architecture question or concern |
 | `thinking` | string | no | Reasoning depth (use `high` for complex systems) |
 | `session_name` | string | no | Session identifier |
+| `model` | string | no | Gemini model id; omit for the server default (`gemini-3.5-flash`) |
 
 **When to use:**
 - Choosing between architectural patterns
@@ -159,3 +173,49 @@ gemini_architect(
     question="Is per-tenant topic isolation worth the operational overhead at 1000 tenants?"
 )
 ```
+
+---
+
+## gemini_list_models
+
+**Purpose:** Discovery utility — lists the Gemini models available on the bridge's active
+backend, so Claude (or you) can pick a valid value for the `model=` parameter. This is a
+metadata call, not an inference: it has no `thinking` or `session_name` parameter and is not
+written to the transcript.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `refresh` | bool | no | Re-fetch the live list, bypassing the per-process cache (default `false`) |
+
+**Behavior:**
+- Fetches the live catalog via the backend's `models.list`, then filters to **chat-capable**
+  models — image, TTS, audio, embedding, and live-streaming models are excluded (they report
+  `generateContent` too, so the filter is name-based, not capability-based).
+- Renders a compact table: model id, display name, and `(default)` / `(alias)` markers, headed
+  by the active backend name. The default is listed first.
+- Caches the result for the process lifetime; `refresh=true` forces a re-fetch.
+- **Graceful degradation:** if the live catalog can't be fetched, returns the curated static
+  shortlist (from `models.py`) with a clear "live list unavailable" notice instead of failing.
+
+**Example:**
+```
+gemini_list_models()
+gemini_list_models(refresh=True)   # force a fresh fetch
+```
+
+**How it resolves:**
+
+```mermaid
+flowchart TD
+    A["gemini_list_models(refresh?)"] --> B{cached and not refresh?}
+    B -->|yes| C[return cached table]
+    B -->|no| D["client.list_models → backend models.list"]
+    D --> E{fetch ok?}
+    E -->|yes| F[filter to chat-capable<br/>drop image/tts/audio/embedding/live]
+    F --> G[render table<br/>default first, mark default/alias]
+    G --> H[cache + return]
+    E -->|no| I[return curated static shortlist<br/>+ 'live unavailable' notice<br/>not cached]
+```
+
+See [configuration.md](configuration.md#choosing-a-model) for the recommended models per backend.

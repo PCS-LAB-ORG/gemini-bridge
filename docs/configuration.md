@@ -10,7 +10,6 @@ Created by `bash setup.sh`. Safe to edit by hand.
 {
   "project": "my-gcp-project",
   "location": "global",
-  "model": "gemini-2.5-flash",
   "default_thinking": "medium",
   "transcript_dir": "./session-summaries",
   "auth": {
@@ -18,6 +17,9 @@ Created by `bash setup.sh`. Safe to edit by hand.
   }
 }
 ```
+
+> **There is no `model` config field.** The default model is built into the server and the model
+> is chosen **per call** via the `model=` parameter. See [Choosing a model](#choosing-a-model).
 
 ## Field reference
 
@@ -39,33 +41,24 @@ granted to your ADC credentials or service account.
 **Default:** `"global"`
 **Example:** `"us-central1"`
 
-Vertex AI location. `"global"` works for all models and is the recommended default.
+Vertex AI location. `"global"` works for all models and is the recommended default. Only used
+by the Vertex AI backends (`adc`/`env`/`keychain`); ignored in `api_key` mode.
 
-**Gemini 3.x models** (`gemini-3.*`) are **global-only** — they do not support specific
-regional endpoints. If you set a region with a 3.x model, the server will fail to start
-with a validation error.
+`"global"` routes to the lowest-latency region automatically and is the safest choice —
+newer models (e.g. `gemini-3.5-flash`) are frequently **global-only**. Set a specific region
+(e.g. `us-central1`, `europe-west1`) only if you have a data-residency requirement, and confirm
+your chosen model is offered there; a model not served in your region returns a 404 at call time.
 
-**Gemini 2.5 models** (`gemini-2.5-flash`, `gemini-2.5-pro`) support `"global"` plus
-specific regions: `us-central1`, `us-east4`, `europe-west1`, `asia-northeast1`, and
-others. Use a specific region if you have data-residency requirements.
+> **Note:** The server does not currently validate location against the chosen model at startup —
+> `"global"` is recommended precisely because it sidesteps per-model regional gaps.
+> (Backend/location-aware validation is tracked as a future enhancement.)
 
 ---
 
-### `model`
+### Model selection
 
-**Type:** string
-**Default:** `"gemini-2.5-flash"`
-**Valid prefixes:** `gemini-2.*`, `gemini-3.*`
-
-| Model | Speed | Cost | Notes |
-|---|---|---|---|
-| `gemini-2.5-flash` | Fast | Low | Default; good for most tasks |
-| `gemini-2.5-pro` | Slower | Higher | Better for complex reasoning |
-| `gemini-3.5-flash` | Fast | Low | Newest Flash generation |
-| `gemini-3.1-pro-preview` | Slower | Higher | Newest Pro (preview) |
-
-The model family (2.x vs 3.x) determines how thinking levels are translated to API parameters.
-Mixing an unknown prefix causes a startup error.
+There is **no `model` config field.** Model choice is per-call — see
+[Choosing a model](#choosing-a-model) below.
 
 ---
 
@@ -137,3 +130,52 @@ reads the key from this env var and raises an error if it is unset or empty.
 
 Common values: `"GEMINI_API_KEY"` (AI Studio default), `"GOOGLE_API_KEY"` (alternative).
 If both are set in your shell, `GOOGLE_API_KEY` takes precedence in the SDK.
+
+---
+
+## Choosing a model
+
+Model selection is **per call**, not per config. Every tool accepts an optional `model=`
+parameter; omit it to use the server default.
+
+- **Default:** `gemini-3.5-flash` (built into the server as `DEFAULT_MODEL`).
+- **Fallback:** if the requested/default model returns a terminal overload (503/429) after
+  retries, the call is retried once against `gemini-2.5-flash` (`FALLBACK_MODEL`) and the
+  response is prefixed with a visible `[gemini-bridge notice]` so the substitution is never silent.
+- **Discovery:** the `model` parameter's description is **backend-aware** (it lists the models
+  valid for your active backend), and the `gemini_list_models` tool returns the live, chat-only
+  catalog. See [tools.md](tools.md#gemini_list_models).
+
+### Recommended models by backend
+
+| Backend (`auth.method`) | Recommended | Notes |
+|---|---|---|
+| **Developer API** (`api_key`) | `gemini-3.5-flash` (default), `gemini-2.5-flash`, `gemini-flash-latest`, `gemini-pro-latest`, `gemini-2.5-pro` | `-latest` aliases auto-track the newest release |
+| **Vertex AI** (`adc`/`env`/`keychain`) | `gemini-3.5-flash` (default), `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.1-flash-lite` | No `-latest` aliases — they 404 on Vertex; use versioned names |
+
+The `-latest` aliases (e.g. `gemini-flash-latest`) are a **Developer-API-only** convention.
+On Vertex AI they return 404 — the bridge logs a warning if you pass one under a Vertex backend.
+
+> **Model families and thinking levels:** the model prefix determines how the `thinking` level
+> maps to API parameters — `gemini-2.*` (and `-latest` aliases) use a token `thinking_budget`;
+> `gemini-3.*` uses a `thinking_level` enum. An unrecognized prefix raises a `ClientError` at
+> call time. See [tools.md](tools.md) for the thinking-level table.
+
+### How a model value is resolved
+
+```mermaid
+flowchart TD
+    A[Tool call] --> B{model= provided?}
+    B -->|yes| C[use requested model]
+    B -->|no| D[use DEFAULT_MODEL<br/>gemini-3.5-flash]
+    C --> E{auth.method}
+    D --> E
+    E -->|api_key| F[Developer API<br/>aliases OK]
+    E -->|adc / env / keychain| G[Vertex AI<br/>versioned names]
+    F --> H[send request]
+    G --> H
+    H --> I{503 / 429 after retries?}
+    I -->|no| J[return response]
+    I -->|yes, and model != fallback| K[retry once on<br/>gemini-2.5-flash]
+    K --> L[return response<br/>+ notice]
+```
