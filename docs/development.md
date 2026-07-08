@@ -5,8 +5,8 @@
 ```bash
 git clone https://github.com/PCS-LAB-ORG/gemini-bridge.git
 cd gemini-bridge
-pip install -e .
-pip install pytest pytest-asyncio
+python3 -m pip install -e .
+python3 -m pip install pytest pytest-asyncio
 pre-commit install
 pre-commit install --hook-type commit-msg
 ```

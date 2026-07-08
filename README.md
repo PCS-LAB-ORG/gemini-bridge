@@ -57,7 +57,7 @@ All tools share optional `thinking` (`none`/`low`/`medium`/`high`) and `session_
 # 1. Clone and install
 git clone https://github.com/PCS-LAB-ORG/gemini-bridge.git
 cd gemini-bridge
-pip install -e .
+python3 -m pip install -e .
 
 # 2. Configure (interactive wizard — reads existing config as defaults on re-run)
 bash setup.sh

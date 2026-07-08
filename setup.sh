@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # setup.sh — gemini-bridge interactive configuration wizard
-# Run once after pip install -e . to create ~/.config/gemini-bridge/config.json
+# Run once after "python3 -m pip install -e ." to create ~/.config/gemini-bridge/config.json
 # Safe to re-run: overwrites existing config with new values. Existing values
 # are read and used as prompt defaults so you only change what you want.
 
@@ -295,7 +295,7 @@ info "Config written to $CONFIG_FILE"
 echo
 info "=== Next steps ==="
 echo
-echo "  pip install -e ."
+echo "  python3 -m pip install -e ."
 echo "  claude mcp add -s user gemini-bridge -- python3 -m gemini_bridge"
 echo "  claude mcp list"
 echo
