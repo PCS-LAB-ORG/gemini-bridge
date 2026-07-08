@@ -101,6 +101,38 @@ class TestAsk:
         with pytest.raises(ClientError, match="inference failed"):
             client.ask(mock_session, "Hello", "medium")
 
+    def test_ask_retries_on_503_and_eventually_succeeds(self) -> None:
+        client = _make_client()
+        mock_session = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "ok"
+        mock_session.send_message.side_effect = [
+            RuntimeError("503 UNAVAILABLE"),
+            mock_response,
+        ]
+        with patch("gemini_bridge.client.time.sleep"):
+            result = client.ask(mock_session, "Hello", "low")
+        assert result == "ok"
+        assert mock_session.send_message.call_count == 2
+
+    def test_ask_raises_after_all_retries_exhausted(self) -> None:
+        client = _make_client()
+        mock_session = MagicMock()
+        mock_session.send_message.side_effect = RuntimeError("503 UNAVAILABLE")
+        with patch("gemini_bridge.client.time.sleep"):
+            with pytest.raises(ClientError, match="after 4 attempt"):
+                client.ask(mock_session, "Hello", "low")
+
+    def test_ask_does_not_retry_non_retryable_error(self) -> None:
+        client = _make_client()
+        mock_session = MagicMock()
+        mock_session.send_message.side_effect = RuntimeError("400 INVALID_ARGUMENT")
+        with patch("gemini_bridge.client.time.sleep") as mock_sleep:
+            with pytest.raises(ClientError):
+                client.ask(mock_session, "Hello", "low")
+        mock_sleep.assert_not_called()
+        assert mock_session.send_message.call_count == 1
+
     def test_ask_uses_config_default_thinking_when_none(self) -> None:
         client = _make_client()
         mock_session = MagicMock()
