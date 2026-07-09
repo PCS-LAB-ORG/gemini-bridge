@@ -18,8 +18,9 @@ Created by `bash setup.sh`. Safe to edit by hand.
 }
 ```
 
-> **There is no `model` config field.** The default model is built into the server and the model
-> is chosen **per call** via the `model=` parameter. See [Choosing a model](#choosing-a-model).
+> **Model selection:** set the optional `default_model` field to change the server default; leave
+> it unset for the built-in default (`gemini-3.5-flash`). Individual calls always override it
+> **per call** via the `model=` parameter. See [Choosing a model](#choosing-a-model).
 
 ## Field reference
 
@@ -55,10 +56,17 @@ your chosen model is offered there; a model not served in your region returns a 
 
 ---
 
-### Model selection
+### `default_model`
 
-There is **no `model` config field.** Model choice is per-call — see
-[Choosing a model](#choosing-a-model) below.
+**Type:** string (optional)
+**Default:** unset → the built-in default (`gemini-3.5-flash`)
+
+Sets the default model for tool calls that omit the `model` parameter. Leave it unset to use the
+server's built-in default. Individual calls always override it via `model=`. Accepts any model the
+bridge can run (`gemini-2*` / `gemini-3*` or a `-latest` alias); an invalid value raises a
+`ClientError` at call time (there is no config-load validation yet — see #44). The backend-aware
+schema hint and `gemini_list_models` reflect the effective default. See
+[Choosing a model](#choosing-a-model).
 
 ---
 
@@ -135,12 +143,12 @@ If both are set in your shell, `GOOGLE_API_KEY` takes precedence in the SDK.
 
 ## Choosing a model
 
-Model selection is **per call**, not per config. Every tool accepts an optional `model=`
-parameter; omit it to use the server default.
+Every tool accepts an optional `model=` parameter; omit it to use the server default.
 
-- **Default:** `gemini-3.5-flash` (built into the server as `DEFAULT_MODEL`).
+- **Default:** the `default_model` config field if set, else the built-in `gemini-3.5-flash`
+  (`DEFAULT_MODEL`) — this effective default is what omitted-`model` calls use.
 - **Fallback:** if the requested/default model returns a terminal overload (503/429) after
-  retries, the call is retried once against `gemini-2.5-flash` (`FALLBACK_MODEL`) and the
+  retries, the call is retried once against `gemini-3.1-flash-lite` (`FALLBACK_MODEL`) and the
   response is prefixed with a visible `[gemini-bridge notice]` so the substitution is never silent.
 - **Discovery:** the `model` parameter's description is **backend-aware** (it lists the models
   valid for your active backend), and the `gemini_list_models` tool returns the live, chat-only
@@ -150,8 +158,12 @@ parameter; omit it to use the server default.
 
 | Backend (`auth.method`) | Recommended | Notes |
 |---|---|---|
-| **Developer API** (`api_key`) | `gemini-3.5-flash` (default), `gemini-2.5-flash`, `gemini-flash-latest`, `gemini-pro-latest`, `gemini-2.5-pro` | `-latest` aliases auto-track the newest release |
-| **Vertex AI** (`adc`/`env`/`keychain`) | `gemini-3.5-flash` (default), `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.1-flash-lite` | No `-latest` aliases — they 404 on Vertex; use versioned names |
+| **Developer API** (`api_key`) | `gemini-3.5-flash` (default), `gemini-3.1-flash-lite`, `gemini-flash-latest`, `gemini-pro-latest` | `-latest` aliases auto-track the newest release |
+| **Vertex AI** (`adc`/`env`/`keychain`) | `gemini-3.5-flash` (default), `gemini-3.1-flash-lite`, `gemini-3.1-pro-preview`, `gemini-2.5-pro` | No `-latest` aliases — they 404 on Vertex; use versioned names |
+
+> **Gemini 2.5 retires 2026-10-16.** The shortlists above lead with the long-lived Gemini 3.x GA
+> models. `gemini-2.5-flash`/`-pro` still work (and appear in `gemini_list_models`) until then;
+> `gemini-2.5-pro` is kept as the Vertex stable-Pro option until it retires.
 
 The `-latest` aliases (e.g. `gemini-flash-latest`) are a **Developer-API-only** convention.
 On Vertex AI they return 404 — the bridge logs a warning if you pass one under a Vertex backend.
@@ -168,7 +180,7 @@ On Vertex AI they return 404 — the bridge logs a warning if you pass one under
 flowchart TD
     A[Tool call] --> B{model= provided?}
     B -->|yes| C[use requested model]
-    B -->|no| D[use DEFAULT_MODEL<br/>gemini-3.5-flash]
+    B -->|no| D["use effective default<br/>default_model or gemini-3.5-flash"]
     C --> E{auth.method}
     D --> E
     E -->|api_key| F[Developer API<br/>aliases OK]
@@ -177,6 +189,6 @@ flowchart TD
     G --> H
     H --> I{503 / 429 after retries?}
     I -->|no| J[return response]
-    I -->|yes, and model != fallback| K[retry once on<br/>gemini-2.5-flash]
+    I -->|yes, and model != fallback| K[retry once on<br/>gemini-3.1-flash-lite]
     K --> L[return response<br/>+ notice]
 ```

@@ -30,6 +30,37 @@ def _model_description(mcp: object, tool_name: str) -> str:
     return tool.inputSchema["properties"]["model"]["description"]
 
 
+def _param_description(mcp: object, tool_name: str, param: str):
+    """Pull a named param's description from a registered tool's JSON schema (None if absent)."""
+    tools = asyncio.run(mcp.list_tools())  # type: ignore[attr-defined]
+    tool = next(t for t in tools if t.name == tool_name)
+    return tool.inputSchema["properties"][param].get("description")
+
+
+def _register_all_tools(tmp_path: object) -> object:
+    from datetime import datetime
+
+    from mcp.server.fastmcp import FastMCP
+
+    from gemini_bridge.tools import (
+        register_architect,
+        register_ask,
+        register_brainstorm,
+        register_debug,
+        register_review,
+    )
+
+    client = _make_client()
+    transcript = TranscriptWriter(str(tmp_path), datetime.now())
+    mcp = FastMCP("t")
+    register_ask(mcp, client, transcript)
+    register_brainstorm(mcp, client, transcript)
+    register_review(mcp, client, transcript)
+    register_debug(mcp, client, transcript)
+    register_architect(mcp, client, transcript)
+    return mcp
+
+
 def _make_transcript(tmp_path: "Path") -> TranscriptWriter:
     from datetime import datetime
 
@@ -196,6 +227,13 @@ class TestModelParamHint:
         hint = model_param_hint(_make_client())  # adc -> vertex
         assert "-latest" not in hint
 
+    def test_helper_reflects_config_default_model(self) -> None:
+        config = Config(auth={"method": "api_key"}, default_model="gemini-2.5-pro")
+        with patch("google.genai.Client"):
+            client = GeminiClient(config, api_key="k")
+        hint = model_param_hint(client)
+        assert "server default (gemini-2.5-pro)" in hint
+
     def test_registered_schema_developer_lists_aliases(self, tmp_path: Path) -> None:
         from datetime import datetime
 
@@ -224,3 +262,35 @@ class TestModelParamHint:
         desc = _model_description(mcp, "gemini_ask")
         assert "-latest" not in desc
         assert "gemini-3.5-flash" in desc
+
+
+class TestAllParamDescriptionsSurface:
+    """Every tool param description must reach the generated JSON schema (#55).
+
+    A bare string in Annotated[...] is silently dropped by Pydantic v2 / FastMCP — only
+    Field(description=...) surfaces. This pins that all params carry a schema description.
+    """
+
+    EXPECTED = {
+        "gemini_ask": ["prompt", "thinking", "session_name", "model"],
+        "gemini_brainstorm": ["topic", "context", "thinking", "session_name", "model"],
+        "gemini_review": ["content", "question", "thinking", "session_name", "model"],
+        "gemini_debug": ["error", "context", "thinking", "session_name", "model"],
+        "gemini_architect": ["description", "question", "thinking", "session_name", "model"],
+    }
+
+    def test_every_param_has_a_schema_description(self, tmp_path: Path) -> None:
+        mcp = _register_all_tools(tmp_path)
+        missing = []
+        for tool, params in self.EXPECTED.items():
+            for param in params:
+                if not _param_description(mcp, tool, param):
+                    missing.append(f"{tool}.{param}")
+        assert not missing, f"params missing schema descriptions: {missing}"
+
+    def test_representative_descriptions_are_correct(self, tmp_path: Path) -> None:
+        mcp = _register_all_tools(tmp_path)
+        assert "question or request" in (_param_description(mcp, "gemini_ask", "prompt") or "")
+        assert "Reasoning depth" in (_param_description(mcp, "gemini_ask", "thinking") or "")
+        assert "stack trace" in (_param_description(mcp, "gemini_debug", "error") or "")
+        assert "brainstorm" in (_param_description(mcp, "gemini_brainstorm", "topic") or "")

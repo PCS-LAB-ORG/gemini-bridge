@@ -42,16 +42,24 @@ def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -
 
     @mcp.tool()
     def gemini_debug(
-        error: Annotated[str, "The error message, stack trace, or failure description"],
+        error: Annotated[
+            str, Field(description="The error message, stack trace, or failure description")
+        ],
         context: Annotated[
             str,
-            "Optional context: relevant code, recent changes, environment details.",
+            Field(
+                description="Optional context: relevant code, recent changes, environment details."
+            ),
         ] = "",
         thinking: Annotated[
             Optional[ThinkingLevel],
-            "Reasoning depth: none, low, medium, high. Defaults to config setting.",
+            Field(
+                description="Reasoning depth: none, low, medium, high. Defaults to config setting."
+            ),
         ] = None,
-        session_name: Annotated[str, "Session name for conversation continuity."] = "default",
+        session_name: Annotated[
+            str, Field(description="Session name for conversation continuity.")
+        ] = "default",
         model: Annotated[Optional[str], Field(description=model_hint)] = None,
     ) -> ToolResult:
         """Ask Gemini for root cause hypotheses and diagnostic steps. Provide the error

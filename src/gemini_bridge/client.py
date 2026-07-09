@@ -38,12 +38,13 @@ from google.genai.types import ThinkingLevel as SDKThinkingLevel
 
 from gemini_bridge.config import Config, ModelFamily, ThinkingLevel
 
-# Default model used when a tool call does not specify one.
-# gemini-3.5-flash is GA on both the Developer API and Vertex AI — near-Pro quality at
-# Flash cost/speed. Falls back to the rock-stable gemini-2.5-flash on overload.
+# Default model used when a tool call does not specify one (unless overridden by config).
+# gemini-3.5-flash is GA on both the Developer API and Vertex AI — the frontier Flash model.
 DEFAULT_MODEL = "gemini-3.5-flash"
-# Stable fallback model used when the requested model returns a terminal 503/429.
-FALLBACK_MODEL = "gemini-2.5-flash"
+# Fallback model used when the requested model returns a terminal 503/429. gemini-3.1-flash-lite
+# is GA on both backends (retires 2027+), the cheapest/most-available Gemini 3 model, and has a
+# Developer-API free tier — an ideal safety net, and distinct from the default so it substitutes.
+FALLBACK_MODEL = "gemini-3.1-flash-lite"
 
 # Thinking budget token counts for Gemini 2.x models
 _THINKING_BUDGET_2X: dict[str, int] = {
@@ -85,7 +86,7 @@ def _warn_model_backend_mismatch(model: str, is_vertex: bool) -> None:
         _log.warning(
             "model %r is a preview model — availability via Google AI Studio API keys "
             "varies. If you get 404/503, try a GA model like 'gemini-3.5-flash' or "
-            "'gemini-2.5-flash'.",
+            "'gemini-3.1-flash-lite'.",
             model,
         )
     elif is_vertex and "-latest" in model:
@@ -162,7 +163,7 @@ class GeminiClient:
 
         Sessions are keyed by (name, model) — changing the model creates a new session.
         """
-        effective_model = model or DEFAULT_MODEL
+        effective_model = model or self.default_model
         _warn_model_backend_mismatch(effective_model, self._is_vertex)
         cache_key = f"{name}:{effective_model}"
         if cache_key in self._sessions:
@@ -181,6 +182,12 @@ class GeminiClient:
     @property
     def default_thinking(self) -> ThinkingLevel:
         return self._config.default_thinking
+
+    @property
+    def default_model(self) -> str:
+        """Effective default model for calls that omit `model`: the config's `default_model`
+        override if set, else the built-in DEFAULT_MODEL."""
+        return self._config.default_model or DEFAULT_MODEL
 
     @property
     def auth_method(self) -> str:
@@ -206,7 +213,7 @@ class GeminiClient:
         system_instruction: Optional[str] = None,
         model: Optional[str] = None,
     ) -> GenerateContentConfig:
-        effective_model = model or DEFAULT_MODEL
+        effective_model = model or self.default_model
         si = {"system_instruction": system_instruction} if system_instruction else {}
         family = _model_family(effective_model)
         if family == ModelFamily.GEMINI_2:
@@ -245,7 +252,7 @@ class GeminiClient:
         gen_config = self._build_generation_config(effective_thinking, system_instruction, model)
         _log.debug(
             "ask: model=%s thinking=%s prompt_len=%d",
-            model or DEFAULT_MODEL,
+            model or self.default_model,
             effective_thinking,
             len(prompt),
         )
@@ -273,7 +280,7 @@ class GeminiClient:
                         hint = (
                             " The model appears overloaded or quota-limited. "
                             "Try again shortly, or pass a different model "
-                            "(e.g. model='gemini-2.5-flash') to avoid the busy endpoint."
+                            "(e.g. model='gemini-3.1-flash-lite') to avoid the busy endpoint."
                         )
                     raise ClientError(f"Gemini inference failed{suffix}: {exc}{hint}") from exc
         if not response.text:

@@ -54,7 +54,7 @@ sequenceDiagram
     S->>G: send to chosen model
     alt model overloaded (503/429)
         G-->>S: terminal error
-        S->>G: retry once on FALLBACK_MODEL (gemini-2.5-flash)
+        S->>G: retry once on FALLBACK_MODEL (gemini-3.1-flash-lite)
         G-->>S: response
         Note over S: prepend "[gemini-bridge notice]" disclosure
     else success
@@ -112,15 +112,16 @@ Restart Claude Code after step 3. On next start you'll see startup entries in th
 | `project` | — | GCP project ID (required for `adc`/`env`/`keychain`; omit for `api_key`) |
 | `location` | `global` | Vertex AI location; `global` is recommended and works for all models; omit for `api_key` |
 | `default_thinking` | `medium` | Thinking level when omitted per call |
+| `default_model` | *(built-in)* | Default Gemini model for calls that omit `model=`. Unset → built-in `gemini-3.5-flash`. Per-call `model=` always overrides |
 | `transcript_dir` | `./session-summaries` | Transcript directory; relative paths resolve to the project root where Claude Code was launched |
 | `auth.method` | `adc` | `adc` · `env` · `keychain` · `api_key` |
 | `auth.keychain_service` | `gemini-bridge` | Keychain service name (`keychain` only) |
 | `auth.keychain_account` | `vertex-sa` | Keychain account name (`keychain` only) |
 | `auth.api_key_env` | `GEMINI_API_KEY` | Env var name holding the AI Studio key (`api_key` only; key is never stored in config) |
 
-> **Note:** There is no `model` config field. The default model is built into the server
-> (`gemini-3.5-flash`); select a different model **per call** via the `model=` parameter on any
-> tool. See [Choosing a model](#choosing-a-model).
+> **Note:** Set `default_model` to change the server's default model; leave it unset to use the
+> built-in default (`gemini-3.5-flash`). Individual calls always override it **per call** via the
+> `model=` parameter on any tool. See [Choosing a model](#choosing-a-model).
 
 See [docs/configuration.md](docs/configuration.md) for the full field reference.
 
@@ -128,17 +129,18 @@ See [docs/configuration.md](docs/configuration.md) for the full field reference.
 
 ## Choosing a model
 
-Every tool accepts an optional `model=` parameter. Omit it to use the server default
-(`gemini-3.5-flash`), which transparently falls back to `gemini-2.5-flash` if the endpoint is
-overloaded (503/429), with a visible notice in the response.
+Every tool accepts an optional `model=` parameter. Omit it to use the server default — the
+`default_model` config field if set, otherwise the built-in `gemini-3.5-flash` — which
+transparently falls back to `gemini-3.1-flash-lite` if the endpoint is overloaded (503/429), with
+a visible notice in the response.
 
 The recommended set is **backend-aware** — the `model` parameter's description adapts to your
 active backend, and `gemini_list_models` returns the live, chat-only catalog:
 
 | Backend (`auth.method`) | Recommended models | `-latest` aliases |
 |---|---|---|
-| **Developer API** (`api_key`) | `gemini-3.5-flash` (default), `gemini-2.5-flash`, `gemini-flash-latest`, `gemini-pro-latest`, `gemini-2.5-pro` | ✅ supported |
-| **Vertex AI** (`adc`/`env`/`keychain`) | `gemini-3.5-flash` (default), `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.1-flash-lite` | ❌ 404 on Vertex — use versioned names |
+| **Developer API** (`api_key`) | `gemini-3.5-flash` (default), `gemini-3.1-flash-lite`, `gemini-flash-latest`, `gemini-pro-latest` | ✅ supported |
+| **Vertex AI** (`adc`/`env`/`keychain`) | `gemini-3.5-flash` (default), `gemini-3.1-flash-lite`, `gemini-3.1-pro-preview`, `gemini-2.5-pro` | ❌ 404 on Vertex — use versioned names |
 
 `-latest` aliases (e.g. `gemini-flash-latest`) are a **Developer-API-only** convention; they
 return 404 on Vertex AI. Call `gemini_list_models` any time for the authoritative list scoped to
