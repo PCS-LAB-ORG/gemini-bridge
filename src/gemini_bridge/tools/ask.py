@@ -42,14 +42,16 @@ def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -
 
     @mcp.tool()
     def gemini_ask(
-        prompt: Annotated[str, "The question or request to send to Gemini"],
+        prompt: Annotated[str, Field(description="The question or request to send to Gemini")],
         thinking: Annotated[
             Optional[ThinkingLevel],
-            "Reasoning depth: none, low, medium, high. Defaults to config setting.",
+            Field(
+                description="Reasoning depth: none, low, medium, high. Defaults to config setting."
+            ),
         ] = None,
         session_name: Annotated[
             str,
-            "Session name for conversation continuity (v1: always 'default').",
+            Field(description="Session name for conversation continuity (v1: always 'default')."),
         ] = "default",
         model: Annotated[Optional[str], Field(description=model_hint)] = None,
     ) -> ToolResult:
