@@ -42,7 +42,7 @@ class ModelMeta(Protocol):
 
 # Backend identifiers.
 DEVELOPER_API = "developer"  # api_key mode (Google AI Studio Developer API)
-VERTEX = "vertex"            # adc/env/keychain modes (Vertex AI)
+VERTEX = "vertex"  # adc/env/keychain modes (Vertex AI)
 
 # Curated, recommended shortlist per backend: (model_id, one-line label).
 # Order matters — the first entry is presented first and is the default family.
@@ -66,7 +66,16 @@ RECOMMENDED: dict[str, list[tuple[str, str]]] = {
 # so filtering on that action alone is insufficient (verified live 2026-07-08). Beyond the
 # media modalities, these also exclude specialized gemini-prefixed variants that are not
 # text-chat (computer-use, robotics, omni).
-_NON_CHAT_MARKERS = ("image", "tts", "audio", "embedding", "live", "computer-use", "robotics", "omni")
+_NON_CHAT_MARKERS = (
+    "image",
+    "tts",
+    "audio",
+    "embedding",
+    "live",
+    "computer-use",
+    "robotics",
+    "omni",
+)
 
 # Allowlist of recognized Gemini chat generations. The live catalog also carries non-chat
 # families (gemma, lyria, nano-banana, antigravity, deep-research) that a name blocklist can't
@@ -110,7 +119,8 @@ def is_chat_capable(meta: ModelMeta) -> bool:
 
     `meta` is a google.genai.types.Model (or any object with `.name` and `.supported_actions`).
     Three gates, in order:
-      1. must report `generateContent` (necessary but NOT sufficient — image/tts models do too);
+      1. when supported_actions is populated, must include `generateContent` (Vertex AI returns
+         None for this field, so the gate is skipped entirely for Vertex models);
       2. must not carry a non-chat marker (image/tts/audio/embedding/live/computer-use/robotics/omni);
       3. must be a recognized Gemini chat generation (gemini-2*/gemini-3*) or a '-latest' alias —
          an allowlist mirroring _model_family(), so non-chat families the bridge can't run
@@ -118,7 +128,8 @@ def is_chat_capable(meta: ModelMeta) -> bool:
     Previews (e.g. gemini-3-pro-preview) are intentionally included — they are valid, usable models.
     """
     name = (getattr(meta, "name", "") or "").split("/")[-1]
-    if "generateContent" not in (getattr(meta, "supported_actions", None) or []):
+    actions = getattr(meta, "supported_actions", None)
+    if actions is not None and "generateContent" not in actions:
         return False
     if any(marker in name for marker in _NON_CHAT_MARKERS):
         return False

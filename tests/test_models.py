@@ -88,7 +88,31 @@ class TestIsChatCapable:
         assert models.is_chat_capable(_meta("models/gemini-live-2.5-flash-preview")) is False
 
     def test_no_generatecontent_excluded(self) -> None:
-        assert models.is_chat_capable(_meta("models/gemini-2.5-flash", actions=["countTokens"])) is False
+        # Developer API: supported_actions populated but generateContent absent → excluded.
+        assert (
+            models.is_chat_capable(_meta("models/gemini-2.5-flash", actions=["countTokens"]))
+            is False
+        )
+
+    def test_vertex_none_actions_passes_name_gates(self) -> None:
+        # Vertex AI returns supported_actions=None for all models; the action gate must be
+        # skipped so name-based gates remain the only filter.
+        none_meta = SimpleNamespace(
+            name="publishers/google/models/gemini-2.5-flash", supported_actions=None
+        )
+        assert models.is_chat_capable(none_meta) is True
+
+    def test_vertex_none_actions_non_chat_still_excluded(self) -> None:
+        # Even with supported_actions=None, the name-based gates still block non-chat models.
+        for name in (
+            "publishers/google/models/gemini-2.5-pro-tts",
+            "publishers/google/models/gemini-2.5-flash-tts",
+            "publishers/google/models/gemini-live-2.5-flash-native-audio",
+            "publishers/google/models/gemini-3.1-flash-image",
+            "publishers/google/models/gemini-embedding-2",
+        ):
+            none_meta = SimpleNamespace(name=name, supported_actions=None)
+            assert models.is_chat_capable(none_meta) is False, name
 
     def test_bare_name_without_prefix(self) -> None:
         # Some SDK paths yield the id without a "models/" prefix.
