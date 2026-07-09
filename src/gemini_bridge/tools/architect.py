@@ -43,16 +43,22 @@ def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -
 
     @mcp.tool()
     def gemini_architect(
-        description: Annotated[str, "The system design, architecture, or approach to evaluate"],
+        description: Annotated[
+            str, Field(description="The system design, architecture, or approach to evaluate")
+        ],
         question: Annotated[
             str,
-            "Optional specific architecture question or concern to focus on.",
+            Field(description="Optional specific architecture question or concern to focus on."),
         ] = "",
         thinking: Annotated[
             Optional[ThinkingLevel],
-            "Reasoning depth: none, low, medium, high. Defaults to config setting.",
+            Field(
+                description="Reasoning depth: none, low, medium, high. Defaults to config setting."
+            ),
         ] = None,
-        session_name: Annotated[str, "Session name for conversation continuity."] = "default",
+        session_name: Annotated[
+            str, Field(description="Session name for conversation continuity.")
+        ] = "default",
         model: Annotated[Optional[str], Field(description=model_hint)] = None,
     ) -> ToolResult:
         """Ask Gemini to evaluate a system design or architecture. Gemini will be opinionated

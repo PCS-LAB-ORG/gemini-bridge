@@ -43,16 +43,22 @@ def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -
 
     @mcp.tool()
     def gemini_brainstorm(
-        topic: Annotated[str, "The topic or problem to brainstorm about"],
+        topic: Annotated[str, Field(description="The topic or problem to brainstorm about")],
         context: Annotated[
             str,
-            "Optional context: what Claude is currently doing or has already considered.",
+            Field(
+                description="Optional context: what Claude is currently doing or has already considered."
+            ),
         ] = "",
         thinking: Annotated[
             Optional[ThinkingLevel],
-            "Reasoning depth: none, low, medium, high. Defaults to config setting.",
+            Field(
+                description="Reasoning depth: none, low, medium, high. Defaults to config setting."
+            ),
         ] = None,
-        session_name: Annotated[str, "Session name for conversation continuity."] = "default",
+        session_name: Annotated[
+            str, Field(description="Session name for conversation continuity.")
+        ] = "default",
         model: Annotated[Optional[str], Field(description=model_hint)] = None,
     ) -> ToolResult:
         """Ask Gemini for unconventional ideas and alternatives. Gemini will challenge the

@@ -43,16 +43,20 @@ def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -
 
     @mcp.tool()
     def gemini_review(
-        content: Annotated[str, "The code, design, or plan to review"],
+        content: Annotated[str, Field(description="The code, design, or plan to review")],
         question: Annotated[
             str,
-            "Optional specific question to focus the review on.",
+            Field(description="Optional specific question to focus the review on."),
         ] = "",
         thinking: Annotated[
             Optional[ThinkingLevel],
-            "Reasoning depth: none, low, medium, high. Defaults to config setting.",
+            Field(
+                description="Reasoning depth: none, low, medium, high. Defaults to config setting."
+            ),
         ] = None,
-        session_name: Annotated[str, "Session name for conversation continuity."] = "default",
+        session_name: Annotated[
+            str, Field(description="Session name for conversation continuity.")
+        ] = "default",
         model: Annotated[Optional[str], Field(description=model_hint)] = None,
     ) -> ToolResult:
         """Ask Gemini to critically review code, a design, or a plan. Gemini will find
