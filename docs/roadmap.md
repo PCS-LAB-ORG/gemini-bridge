@@ -45,7 +45,7 @@ are out of scope.
 ### Per-Call Model Selection + Discoverability ✓ Shipped
 
 Per-call `model=` parameter on all five inference tools; `-latest` aliases (Developer API);
-transparent fallback to `gemini-2.5-flash` on 503/429 with a disclosure notice; default model
+transparent fallback to `gemini-3.1-flash-lite` on 503/429 with a disclosure notice; default model
 raised to `gemini-3.5-flash`.
 
 Model options are now **discoverable** and **backend-aware**: each tool's `model` parameter

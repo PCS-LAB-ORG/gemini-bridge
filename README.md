@@ -54,7 +54,7 @@ sequenceDiagram
     S->>G: send to chosen model
     alt model overloaded (503/429)
         G-->>S: terminal error
-        S->>G: retry once on FALLBACK_MODEL (gemini-2.5-flash)
+        S->>G: retry once on FALLBACK_MODEL (gemini-3.1-flash-lite)
         G-->>S: response
         Note over S: prepend "[gemini-bridge notice]" disclosure
     else success
@@ -131,16 +131,16 @@ See [docs/configuration.md](docs/configuration.md) for the full field reference.
 
 Every tool accepts an optional `model=` parameter. Omit it to use the server default — the
 `default_model` config field if set, otherwise the built-in `gemini-3.5-flash` — which
-transparently falls back to `gemini-2.5-flash` if the endpoint is overloaded (503/429), with a
-visible notice in the response.
+transparently falls back to `gemini-3.1-flash-lite` if the endpoint is overloaded (503/429), with
+a visible notice in the response.
 
 The recommended set is **backend-aware** — the `model` parameter's description adapts to your
 active backend, and `gemini_list_models` returns the live, chat-only catalog:
 
 | Backend (`auth.method`) | Recommended models | `-latest` aliases |
 |---|---|---|
-| **Developer API** (`api_key`) | `gemini-3.5-flash` (default), `gemini-2.5-flash`, `gemini-flash-latest`, `gemini-pro-latest`, `gemini-2.5-pro` | ✅ supported |
-| **Vertex AI** (`adc`/`env`/`keychain`) | `gemini-3.5-flash` (default), `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.1-flash-lite` | ❌ 404 on Vertex — use versioned names |
+| **Developer API** (`api_key`) | `gemini-3.5-flash` (default), `gemini-3.1-flash-lite`, `gemini-flash-latest`, `gemini-pro-latest` | ✅ supported |
+| **Vertex AI** (`adc`/`env`/`keychain`) | `gemini-3.5-flash` (default), `gemini-3.1-flash-lite`, `gemini-3.1-pro-preview`, `gemini-2.5-pro` | ❌ 404 on Vertex — use versioned names |
 
 `-latest` aliases (e.g. `gemini-flash-latest`) are a **Developer-API-only** convention; they
 return 404 on Vertex AI. Call `gemini_list_models` any time for the authoritative list scoped to

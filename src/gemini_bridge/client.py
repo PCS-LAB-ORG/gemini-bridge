@@ -38,12 +38,13 @@ from google.genai.types import ThinkingLevel as SDKThinkingLevel
 
 from gemini_bridge.config import Config, ModelFamily, ThinkingLevel
 
-# Default model used when a tool call does not specify one.
-# gemini-3.5-flash is GA on both the Developer API and Vertex AI — near-Pro quality at
-# Flash cost/speed. Falls back to the rock-stable gemini-2.5-flash on overload.
+# Default model used when a tool call does not specify one (unless overridden by config).
+# gemini-3.5-flash is GA on both the Developer API and Vertex AI — the frontier Flash model.
 DEFAULT_MODEL = "gemini-3.5-flash"
-# Stable fallback model used when the requested model returns a terminal 503/429.
-FALLBACK_MODEL = "gemini-2.5-flash"
+# Fallback model used when the requested model returns a terminal 503/429. gemini-3.1-flash-lite
+# is GA on both backends (retires 2027+), the cheapest/most-available Gemini 3 model, and has a
+# Developer-API free tier — an ideal safety net, and distinct from the default so it substitutes.
+FALLBACK_MODEL = "gemini-3.1-flash-lite"
 
 # Thinking budget token counts for Gemini 2.x models
 _THINKING_BUDGET_2X: dict[str, int] = {
@@ -85,7 +86,7 @@ def _warn_model_backend_mismatch(model: str, is_vertex: bool) -> None:
         _log.warning(
             "model %r is a preview model — availability via Google AI Studio API keys "
             "varies. If you get 404/503, try a GA model like 'gemini-3.5-flash' or "
-            "'gemini-2.5-flash'.",
+            "'gemini-3.1-flash-lite'.",
             model,
         )
     elif is_vertex and "-latest" in model:
@@ -279,7 +280,7 @@ class GeminiClient:
                         hint = (
                             " The model appears overloaded or quota-limited. "
                             "Try again shortly, or pass a different model "
-                            "(e.g. model='gemini-2.5-flash') to avoid the busy endpoint."
+                            "(e.g. model='gemini-3.1-flash-lite') to avoid the busy endpoint."
                         )
                     raise ClientError(f"Gemini inference failed{suffix}: {exc}{hint}") from exc
         if not response.text:
