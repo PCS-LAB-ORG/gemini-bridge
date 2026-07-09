@@ -110,11 +110,13 @@ def main() -> None:
 
     from gemini_bridge.client import DEFAULT_MODEL
 
+    effective_default_model = config.default_model or DEFAULT_MODEL
+
     if config.auth.method == "api_key":
         _log.info(
             "starting — auth=api_key default_thinking=%s default_model=%s",
             config.default_thinking,
-            DEFAULT_MODEL,
+            effective_default_model,
         )
     else:
         _log.info(
@@ -122,7 +124,7 @@ def main() -> None:
             config.auth.method,
             config.location,
             config.default_thinking,
-            DEFAULT_MODEL,
+            effective_default_model,
         )
 
     client = GeminiClient(config, credentials=auth_result.credentials, api_key=auth_result.api_key)

@@ -30,6 +30,7 @@ PREV_AUTH_METHOD="adc"
 PREV_PROJECT=""
 PREV_LOCATION="global"
 PREV_THINKING="medium"
+PREV_DEFAULT_MODEL=""
 PREV_TRANSCRIPT_DIR="./session-summaries"
 PREV_KEYCHAIN_SERVICE="gemini-bridge"
 PREV_KEYCHAIN_ACCOUNT="vertex-sa"
@@ -47,6 +48,7 @@ try:
         ('PREV_PROJECT',          d.get('project', '')),
         ('PREV_LOCATION',         d.get('location', 'global')),
         ('PREV_THINKING',         d.get('default_thinking', 'medium')),
+        ('PREV_DEFAULT_MODEL',    d.get('default_model', '')),
         ('PREV_TRANSCRIPT_DIR',   d.get('transcript_dir', './session-summaries')),
         ('PREV_KEYCHAIN_SERVICE', auth.get('keychain_service', 'gemini-bridge')),
         ('PREV_KEYCHAIN_ACCOUNT', auth.get('keychain_account', 'vertex-sa')),
@@ -224,6 +226,17 @@ case "$THINKING" in
     *) error "Invalid thinking level: $THINKING" ;;
 esac
 
+# --- default model (optional; blank uses the built-in default) ---
+echo
+echo "Default model for calls that omit an explicit model (blank = built-in gemini-3.5-flash):"
+if [[ "$AUTH_METHOD" == "api_key" ]]; then
+    echo "  e.g. gemini-3.5-flash · gemini-2.5-flash · gemini-flash-latest · gemini-pro-latest · gemini-2.5-pro"
+else
+    echo "  e.g. gemini-3.5-flash · gemini-2.5-flash · gemini-2.5-pro · gemini-3.1-flash-lite"
+fi
+echo "  (a per-call model= always overrides this; run gemini_list_models later for the full list)"
+DEFAULT_MODEL=$(ask "Default model (blank for built-in)" "$PREV_DEFAULT_MODEL")
+
 # --- transcript dir ---
 echo
 TRANSCRIPT_DIR=$(ask "Transcript directory" "$PREV_TRANSCRIPT_DIR")
@@ -249,12 +262,18 @@ else
   }"
 fi
 
+# Optional default_model line — included only when the user supplied a value.
+DEFAULT_MODEL_JSON=""
+if [[ -n "$DEFAULT_MODEL" ]]; then
+    DEFAULT_MODEL_JSON=$'  "default_model": "'"$DEFAULT_MODEL"$'",\n'
+fi
+
 # api_key mode: project and location are not needed (Developer API endpoint)
 if [[ "$AUTH_METHOD" == "api_key" ]]; then
 cat > "$CONFIG_FILE" <<EOF
 {
   "default_thinking": "$THINKING",
-  "transcript_dir": "$TRANSCRIPT_DIR",
+$DEFAULT_MODEL_JSON  "transcript_dir": "$TRANSCRIPT_DIR",
   $AUTH_JSON
 }
 EOF
@@ -264,7 +283,7 @@ cat > "$CONFIG_FILE" <<EOF
   "project": "$PROJECT",
   "location": "$LOCATION",
   "default_thinking": "$THINKING",
-  "transcript_dir": "$TRANSCRIPT_DIR",
+$DEFAULT_MODEL_JSON  "transcript_dir": "$TRANSCRIPT_DIR",
   $AUTH_JSON
 }
 EOF

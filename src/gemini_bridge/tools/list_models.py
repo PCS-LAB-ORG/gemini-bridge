@@ -16,7 +16,7 @@ Design notes:
   - Open/Closed: the chat filter and shortlist come from models.py; this module only renders
 
 Used by:  tools/__init__.py -> register_list_models(), server.py
-Imports:  models.py (filter + shortlist), client.py (GeminiClient, DEFAULT_MODEL, ClientError),
+Imports:  models.py (filter + shortlist), client.py (GeminiClient, ClientError),
           tools/base.py (ToolResult), transcript.py (TranscriptWriter, signature parity)
 """
 
@@ -26,7 +26,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from gemini_bridge import models
-from gemini_bridge.client import DEFAULT_MODEL, ClientError, GeminiClient
+from gemini_bridge.client import ClientError, GeminiClient
 from gemini_bridge.tools.base import ToolResult
 from gemini_bridge.transcript import TranscriptWriter
 
@@ -116,8 +116,8 @@ def render_model_list(client: GeminiClient, backend: str) -> str:
     try:
         raw = client.list_models()
     except ClientError as exc:
-        return format_static_fallback(backend, DEFAULT_MODEL, str(exc))
-    return format_model_list(raw, backend, DEFAULT_MODEL)
+        return format_static_fallback(backend, client.default_model, str(exc))
+    return format_model_list(raw, backend, client.default_model)
 
 
 def register(mcp: FastMCP, client: GeminiClient, transcript: TranscriptWriter) -> None:

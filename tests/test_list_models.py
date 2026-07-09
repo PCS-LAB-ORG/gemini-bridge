@@ -9,7 +9,9 @@ from gemini_bridge.config import Config
 from gemini_bridge.tools import list_models as lm
 
 
-def _meta(name: str, display: str = "", actions=("generateContent", "countTokens")) -> SimpleNamespace:
+def _meta(
+    name: str, display: str = "", actions=("generateContent", "countTokens")
+) -> SimpleNamespace:
     return SimpleNamespace(name=name, display_name=display, supported_actions=list(actions))
 
 
@@ -108,6 +110,20 @@ class TestRenderModelList:
         out = lm.render_model_list(client, models.DEVELOPER_API)
         assert "Live model list unavailable" in out
         assert "gemini-3.5-flash" in out  # from the static shortlist
+
+    def test_default_marker_reflects_config_default(self) -> None:
+        config = Config(auth={"method": "api_key"}, default_model="gemini-2.5-flash")
+        with patch("google.genai.Client"):
+            client = GeminiClient(config, api_key="k")
+        client._raw_client.models.list.return_value = [
+            _meta("models/gemini-3.5-flash", "Gemini 3.5 Flash"),
+            _meta("models/gemini-2.5-flash", "Gemini 2.5 Flash"),
+        ]
+        out = lm.render_model_list(client, models.DEVELOPER_API)
+        lines = [ln for ln in out.splitlines() if ln.startswith("  gemini")]
+        assert lines[0].split()[0] == "gemini-2.5-flash"  # config default listed first
+        assert "(default)" in lines[0]
+        assert "default (gemini-2.5-flash)" in out
 
 
 class TestRegistration:

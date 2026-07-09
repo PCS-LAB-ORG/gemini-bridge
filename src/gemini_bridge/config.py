@@ -67,6 +67,9 @@ class Config(BaseModel):
     project: Optional[str] = None  # required for adc/env/keychain; unused for api_key
     location: str = "global"
     default_thinking: ThinkingLevel = "medium"
+    # Optional per-deployment default model; overrides the built-in DEFAULT_MODEL when set.
+    # Omit to use the server's built-in default. Individual calls override via the model= param.
+    default_model: Optional[str] = None
     transcript_dir: str = "./session-summaries"
     auth: AuthConfig = AuthConfig()
 
@@ -83,7 +86,7 @@ class Config(BaseModel):
 def load_config(path: Path = CONFIG_PATH) -> Config:
     """Load and validate config from path. Raises ConfigError on any failure."""
     if not path.exists():
-        raise ConfigError(f"Config file not found: {path}\n" "Run 'bash setup.sh' to create it.")
+        raise ConfigError(f"Config file not found: {path}\nRun 'bash setup.sh' to create it.")
     try:
         raw = json.loads(path.read_text())
     except json.JSONDecodeError as exc:

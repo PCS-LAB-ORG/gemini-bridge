@@ -229,3 +229,31 @@ class TestAsk:
         client = _make_client()
         cfg = client._build_generation_config("low")
         assert cfg.system_instruction is None
+
+
+class TestDefaultModel:
+    def _client_with_default(self, default_model=None) -> GeminiClient:
+        config = Config(project="test-project", default_model=default_model)
+        with patch("google.genai.Client"):
+            return GeminiClient(config, MagicMock())
+
+    def test_falls_back_to_builtin_when_unset(self) -> None:
+        from gemini_bridge.client import DEFAULT_MODEL
+
+        assert self._client_with_default().default_model == DEFAULT_MODEL
+
+    def test_uses_config_override_when_set(self) -> None:
+        client = self._client_with_default("gemini-2.5-pro")
+        assert client.default_model == "gemini-2.5-pro"
+
+    def test_omitted_model_uses_config_default_for_session(self) -> None:
+        client = self._client_with_default("gemini-2.5-pro")
+        client._raw_client.chats.create.return_value = MagicMock()
+        client.get_or_create_session("ask:default")  # model omitted
+        assert "ask:default:gemini-2.5-pro" in client._sessions
+
+    def test_omitted_model_uses_config_default_for_thinking_config(self) -> None:
+        # config default gemini-2.5-pro -> GEMINI_2 pro path (thinking_budget, min-clamped)
+        client = self._client_with_default("gemini-2.5-pro")
+        cfg = client._build_generation_config("none")  # no model arg
+        assert cfg.thinking_config.thinking_budget == 128  # type: ignore[union-attr]
