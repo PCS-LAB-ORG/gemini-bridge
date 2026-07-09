@@ -26,11 +26,18 @@ If this returns a token, the MCP server will authenticate successfully.
 **One-time setup:**
 ```bash
 gcloud auth application-default login
+gcloud auth application-default set-quota-project YOUR_PROJECT_ID
 ```
 
-This opens a browser and stores a refresh token at
+The first command opens a browser and stores a refresh token at
 `~/.config/gcloud/application_default_credentials.json`. The SDK auto-refreshes access tokens
 from this refresh token — no repeated re-auth.
+
+The second command is required when using **user credentials** (as opposed to a service account).
+User credentials span all your GCP projects, so the Vertex AI API needs to know which project's
+quota to charge. Without it you will receive a `403 PERMISSION_DENIED: quota project not set`
+error when calling the API. See the [Troubleshooting](#troubleshooting) table for the fix if you
+already have ADC set up.
 
 **Config:**
 ```json
@@ -155,6 +162,7 @@ Quota limits are lower than Vertex AI service account access.
 |---|---|---|
 | `no ADC credentials found` | ADC not configured | `gcloud auth application-default login` |
 | `token refresh failed` | ADC refresh token expired | `gcloud auth application-default login` |
+| `403 PERMISSION_DENIED: quota project not set` | ADC user credentials have no quota project | `gcloud auth application-default set-quota-project YOUR_PROJECT_ID` |
 | `GOOGLE_APPLICATION_CREDENTIALS not set` | Env var missing | `export GOOGLE_APPLICATION_CREDENTIALS=...` |
 | `Keychain item not found` | Secret not stored | Re-run the `security add-generic-password` command |
 | `not valid service account JSON` | Keychain value corrupted | Re-store the SA JSON key |
