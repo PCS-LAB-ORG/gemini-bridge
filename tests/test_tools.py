@@ -227,6 +227,13 @@ class TestModelParamHint:
         hint = model_param_hint(_make_client())  # adc -> vertex
         assert "-latest" not in hint
 
+    def test_helper_reflects_config_default_model(self) -> None:
+        config = Config(auth={"method": "api_key"}, default_model="gemini-2.5-pro")
+        with patch("google.genai.Client"):
+            client = GeminiClient(config, api_key="k")
+        hint = model_param_hint(client)
+        assert "server default (gemini-2.5-pro)" in hint
+
     def test_registered_schema_developer_lists_aliases(self, tmp_path: Path) -> None:
         from datetime import datetime
 

@@ -25,7 +25,6 @@ from typing import Optional
 
 from gemini_bridge import models
 from gemini_bridge.client import (
-    DEFAULT_MODEL,
     FALLBACK_MODEL,
     ClientError,
     GeminiClient,
@@ -50,7 +49,7 @@ def model_param_hint(client: GeminiClient) -> str:
     modes surface the alias-free Vertex shortlist. Injected into each tool's Annotated[...]
     so the hint can never contradict the active backend.
     """
-    return models.schema_hint(models.backend_for(client.auth_method), DEFAULT_MODEL)
+    return models.schema_hint(models.backend_for(client.auth_method), client.default_model)
 
 
 def call_gemini(
@@ -93,9 +92,9 @@ def call_gemini(
         response = _do_ask(model)
     except ClientError as exc:
         # If retryable and the model we tried is not already the fallback, retry once on it.
-        # `model or DEFAULT_MODEL` reflects the model actually used — when the caller omits
-        # `model`, the default (not the fallback) was tried, so the fallback still applies.
-        requested = model or DEFAULT_MODEL
+        # `model or client.default_model` reflects the model actually used — when the caller
+        # omits `model`, the effective default (not the fallback) was tried, so fallback applies.
+        requested = model or client.default_model
         if _is_retryable(exc) and requested != FALLBACK_MODEL:
             _log.warning(
                 "%s: model %r overloaded — falling back to %r",

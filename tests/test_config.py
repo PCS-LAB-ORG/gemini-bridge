@@ -101,6 +101,16 @@ def test_api_key_method_no_project_accepted() -> None:
     assert cfg.project is None
 
 
+def test_default_model_defaults_none() -> None:
+    cfg = Config(project="p")
+    assert cfg.default_model is None
+
+
+def test_default_model_accepts_value() -> None:
+    cfg = Config(project="p", default_model="gemini-2.5-pro")
+    assert cfg.default_model == "gemini-2.5-pro"
+
+
 def test_api_key_env_default() -> None:
     from gemini_bridge.config import AuthConfig
 

@@ -112,15 +112,16 @@ Restart Claude Code after step 3. On next start you'll see startup entries in th
 | `project` | — | GCP project ID (required for `adc`/`env`/`keychain`; omit for `api_key`) |
 | `location` | `global` | Vertex AI location; `global` is recommended and works for all models; omit for `api_key` |
 | `default_thinking` | `medium` | Thinking level when omitted per call |
+| `default_model` | *(built-in)* | Default Gemini model for calls that omit `model=`. Unset → built-in `gemini-3.5-flash`. Per-call `model=` always overrides |
 | `transcript_dir` | `./session-summaries` | Transcript directory; relative paths resolve to the project root where Claude Code was launched |
 | `auth.method` | `adc` | `adc` · `env` · `keychain` · `api_key` |
 | `auth.keychain_service` | `gemini-bridge` | Keychain service name (`keychain` only) |
 | `auth.keychain_account` | `vertex-sa` | Keychain account name (`keychain` only) |
 | `auth.api_key_env` | `GEMINI_API_KEY` | Env var name holding the AI Studio key (`api_key` only; key is never stored in config) |
 
-> **Note:** There is no `model` config field. The default model is built into the server
-> (`gemini-3.5-flash`); select a different model **per call** via the `model=` parameter on any
-> tool. See [Choosing a model](#choosing-a-model).
+> **Note:** Set `default_model` to change the server's default model; leave it unset to use the
+> built-in default (`gemini-3.5-flash`). Individual calls always override it **per call** via the
+> `model=` parameter on any tool. See [Choosing a model](#choosing-a-model).
 
 See [docs/configuration.md](docs/configuration.md) for the full field reference.
 
@@ -128,9 +129,10 @@ See [docs/configuration.md](docs/configuration.md) for the full field reference.
 
 ## Choosing a model
 
-Every tool accepts an optional `model=` parameter. Omit it to use the server default
-(`gemini-3.5-flash`), which transparently falls back to `gemini-2.5-flash` if the endpoint is
-overloaded (503/429), with a visible notice in the response.
+Every tool accepts an optional `model=` parameter. Omit it to use the server default — the
+`default_model` config field if set, otherwise the built-in `gemini-3.5-flash` — which
+transparently falls back to `gemini-2.5-flash` if the endpoint is overloaded (503/429), with a
+visible notice in the response.
 
 The recommended set is **backend-aware** — the `model` parameter's description adapts to your
 active backend, and `gemini_list_models` returns the live, chat-only catalog:

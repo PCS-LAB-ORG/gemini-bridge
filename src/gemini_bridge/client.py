@@ -162,7 +162,7 @@ class GeminiClient:
 
         Sessions are keyed by (name, model) — changing the model creates a new session.
         """
-        effective_model = model or DEFAULT_MODEL
+        effective_model = model or self.default_model
         _warn_model_backend_mismatch(effective_model, self._is_vertex)
         cache_key = f"{name}:{effective_model}"
         if cache_key in self._sessions:
@@ -181,6 +181,12 @@ class GeminiClient:
     @property
     def default_thinking(self) -> ThinkingLevel:
         return self._config.default_thinking
+
+    @property
+    def default_model(self) -> str:
+        """Effective default model for calls that omit `model`: the config's `default_model`
+        override if set, else the built-in DEFAULT_MODEL."""
+        return self._config.default_model or DEFAULT_MODEL
 
     @property
     def auth_method(self) -> str:
@@ -206,7 +212,7 @@ class GeminiClient:
         system_instruction: Optional[str] = None,
         model: Optional[str] = None,
     ) -> GenerateContentConfig:
-        effective_model = model or DEFAULT_MODEL
+        effective_model = model or self.default_model
         si = {"system_instruction": system_instruction} if system_instruction else {}
         family = _model_family(effective_model)
         if family == ModelFamily.GEMINI_2:
@@ -245,7 +251,7 @@ class GeminiClient:
         gen_config = self._build_generation_config(effective_thinking, system_instruction, model)
         _log.debug(
             "ask: model=%s thinking=%s prompt_len=%d",
-            model or DEFAULT_MODEL,
+            model or self.default_model,
             effective_thinking,
             len(prompt),
         )
