@@ -230,9 +230,9 @@ esac
 echo
 echo "Default model for calls that omit an explicit model (blank = built-in gemini-3.5-flash):"
 if [[ "$AUTH_METHOD" == "api_key" ]]; then
-    echo "  e.g. gemini-3.5-flash · gemini-2.5-flash · gemini-flash-latest · gemini-pro-latest · gemini-2.5-pro"
+    echo "  e.g. gemini-3.5-flash · gemini-3.1-flash-lite · gemini-flash-latest · gemini-pro-latest"
 else
-    echo "  e.g. gemini-3.5-flash · gemini-2.5-flash · gemini-2.5-pro · gemini-3.1-flash-lite"
+    echo "  e.g. gemini-3.5-flash · gemini-3.1-flash-lite · gemini-3.1-pro-preview · gemini-2.5-pro"
 fi
 echo "  (a per-call model= always overrides this; run gemini_list_models later for the full list)"
 DEFAULT_MODEL=$(ask "Default model (blank for built-in)" "$PREV_DEFAULT_MODEL")
@@ -305,7 +305,7 @@ fi
 echo "  claude mcp list"
 echo
 info "Model selection is per-call (no model in config):"
-echo "  • Default model: gemini-3.5-flash (falls back to gemini-2.5-flash on overload)"
+echo "  • Default model: gemini-3.5-flash (falls back to gemini-3.1-flash-lite on overload)"
 echo "  • Pass model='<id>' to any tool to override; call gemini_list_models to see valid ids"
 if [[ "$AUTH_METHOD" == "api_key" ]]; then
     echo "  • Developer API supports '-latest' aliases (e.g. gemini-flash-latest)"

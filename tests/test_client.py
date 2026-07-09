@@ -242,6 +242,14 @@ class TestDefaultModel:
 
         assert self._client_with_default().default_model == DEFAULT_MODEL
 
+    def test_fallback_model_is_flash_lite_and_differs_from_default(self) -> None:
+        # #58: FALLBACK_MODEL must be a long-lived GA model distinct from the default so the
+        # 503/429 safety net actually substitutes something.
+        from gemini_bridge.client import DEFAULT_MODEL, FALLBACK_MODEL
+
+        assert FALLBACK_MODEL == "gemini-3.1-flash-lite"
+        assert FALLBACK_MODEL != DEFAULT_MODEL
+
     def test_uses_config_override_when_set(self) -> None:
         client = self._client_with_default("gemini-2.5-pro")
         assert client.default_model == "gemini-2.5-pro"

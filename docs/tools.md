@@ -219,7 +219,7 @@ current catalog):
 Gemini chat models on Developer API (Google AI Studio) (17 available):
 
   gemini-3.5-flash                    (default)  — Gemini 3.5 Flash
-  gemini-2.5-flash                    — Gemini 2.5 Flash
+  gemini-3.1-flash-lite               — Gemini 3.1 Flash Lite
   gemini-2.5-pro                      — Gemini 2.5 Pro
   gemini-3-pro-preview                — Gemini 3 Pro Preview
   gemini-3.1-pro-preview              — Gemini 3.1 Pro Preview

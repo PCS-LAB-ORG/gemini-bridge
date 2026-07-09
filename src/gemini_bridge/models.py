@@ -46,19 +46,22 @@ VERTEX = "vertex"  # adc/env/keychain modes (Vertex AI)
 
 # Curated, recommended shortlist per backend: (model_id, one-line label).
 # Order matters — the first entry is presented first and is the default family.
+# Curated shortlists lead with the long-lived Gemini 3.x GA models. The Gemini 2.5 line
+# (gemini-2.5-flash/pro/flash-lite) retires 2026-10-16, so 2.5-flash is dropped from the curated
+# lists (still usable explicitly and shown by gemini_list_models); 2.5-pro is kept only on Vertex
+# as its stable higher-capability Pro until it retires. Verified 2026-07-09.
 RECOMMENDED: dict[str, list[tuple[str, str]]] = {
-    DEVELOPER_API: [  # VERIFIED 2026-07-08 against the live Developer API models.list
-        ("gemini-3.5-flash", "newest Flash — near-Pro quality at Flash cost"),
-        ("gemini-2.5-flash", "stable, fast, reliable"),
+    DEVELOPER_API: [
+        ("gemini-3.5-flash", "most intelligent Flash"),
+        ("gemini-3.1-flash-lite", "fastest, most cost-efficient"),
         ("gemini-flash-latest", "auto-tracks newest Flash (Developer API alias)"),
         ("gemini-pro-latest", "auto-tracks newest Pro (Developer API alias)"),
-        ("gemini-2.5-pro", "higher-capability reasoning"),
     ],
-    VERTEX: [  # VERIFIED 2026-07-08 against Google Cloud Vertex AI model docs (GA models)
-        ("gemini-3.5-flash", "newest Flash — near-Pro quality at Flash cost (GA)"),
-        ("gemini-2.5-flash", "stable, fast, reliable"),
-        ("gemini-2.5-pro", "higher-capability reasoning (stable)"),
-        ("gemini-3.1-flash-lite", "most cost-efficient, high-volume"),
+    VERTEX: [
+        ("gemini-3.5-flash", "most intelligent Flash (GA)"),
+        ("gemini-3.1-flash-lite", "fastest, most cost-efficient (GA)"),
+        ("gemini-3.1-pro-preview", "newest Pro — advanced reasoning (preview)"),
+        ("gemini-2.5-pro", "stable higher-capability Pro (GA)"),
     ],
 }
 

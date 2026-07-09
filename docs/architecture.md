@@ -61,7 +61,7 @@ sequenceDiagram
     alt 503/429 after retries and model != FALLBACK_MODEL
         G-->>C: terminal error
         B->>C: ask(prompt, thinking, FALLBACK_MODEL)
-        C->>G: retry on gemini-2.5-flash
+        C->>G: retry on gemini-3.1-flash-lite
         G-->>C: response
         B-->>T: notice + response
     else success

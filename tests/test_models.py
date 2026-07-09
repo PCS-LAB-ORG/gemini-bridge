@@ -29,13 +29,20 @@ class TestShortlist:
         ids = [model_id for model_id, _ in models.shortlist(models.DEVELOPER_API)]
         assert "gemini-flash-latest" in ids
         assert "gemini-pro-latest" in ids
-        assert "gemini-2.5-flash" in ids
+        assert "gemini-3.1-flash-lite" in ids
 
     def test_vertex_excludes_latest_aliases(self) -> None:
         ids = [model_id for model_id, _ in models.shortlist(models.VERTEX)]
         assert ids, "vertex shortlist must not be empty"
         assert all("-latest" not in model_id for model_id in ids)
-        assert "gemini-2.5-flash" in ids
+        assert "gemini-3.5-flash" in ids
+
+    def test_shortlists_drop_retiring_2_5_flash(self) -> None:
+        # #58: the curated lists lead with long-lived 3.x; the Oct-2026-retiring 2.5-flash is out.
+        for backend in (models.DEVELOPER_API, models.VERTEX):
+            ids = [model_id for model_id, _ in models.shortlist(backend)]
+            assert "gemini-2.5-flash" not in ids, backend
+            assert "gemini-3.1-flash-lite" in ids, backend
 
     def test_default_family_leads_both_backends(self) -> None:
         # gemini-3.5-flash is the server default; it should be presented first.
