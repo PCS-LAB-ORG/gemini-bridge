@@ -185,8 +185,9 @@ else:
     done
     if [[ -z "${!API_KEY_ENV:-}" ]]; then
         warn "$API_KEY_ENV is not set in this shell."
-        echo "  Set it before starting Claude Code, or pass it via MCP env config:"
-        echo "    export $API_KEY_ENV=<your-key>"
+        echo "  Export it (keep the quotes — keys can contain special characters):"
+        echo "    export $API_KEY_ENV=\"your-key-here\""
+        echo "  The exact 'claude mcp add' command is printed at the end of setup."
         echo "  (Proceeding — you can set the env var later)"
     else
         info "$API_KEY_ENV is set"
@@ -296,11 +297,17 @@ echo
 echo "  python3 -m pip install -e ."
 if [[ "$AUTH_METHOD" == "api_key" ]]; then
     echo
-    echo "  # The API key must be passed directly to the server — shell exports don't"
-    echo "  # reach the MCP server process. Use the -e flag to inject it:"
-    echo "  claude mcp add -s user -e $API_KEY_ENV=<paste-your-key-here> -- python3 -m gemini_bridge"
+    echo "  # 1. Export your API key. Keep the quotes — AI Studio keys can contain"
+    echo "  #    characters your shell would otherwise interpret."
+    echo "  export $API_KEY_ENV=\"your-key-here\""
+    echo
+    echo "  # 2. Register the server. The -e flag injects the key into the server's"
+    echo "  #    own environment (a plain shell export does NOT reliably reach the MCP"
+    echo "  #    subprocess). The server name 'gemini-bridge' MUST come first — omit it"
+    echo "  #    and 'claude mcp add' treats 'python3' as the name and fails to connect."
+    echo "  claude mcp add gemini-bridge -s user -e $API_KEY_ENV=\"\$$API_KEY_ENV\" -- python3 -m gemini_bridge"
 else
-    echo "  claude mcp add -s user gemini-bridge -- python3 -m gemini_bridge"
+    echo "  claude mcp add gemini-bridge -s user -- python3 -m gemini_bridge"
 fi
 echo "  claude mcp list"
 echo
