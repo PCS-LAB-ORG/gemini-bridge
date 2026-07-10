@@ -72,7 +72,7 @@ sequenceDiagram
 |---|---|
 | Python 3.11+ | `python3 --version` |
 | Claude Code | MCP-enabled version |
-| Auth | **API key (easiest):** `export GEMINI_API_KEY=...` — get one at [aistudio.google.com/apikey](https://aistudio.google.com/apikey), no GCP needed · **Vertex AI:** ADC, SA key file, or Apple Keychain — requires gcloud CLI + GCP project — see [Auth methods](#auth-methods) |
+| Auth | **API key (easiest):** `export GEMINI_API_KEY="..."` — get one at [aistudio.google.com/apikey](https://aistudio.google.com/apikey), no GCP needed · **Vertex AI:** ADC, SA key file, or Apple Keychain — requires gcloud CLI + GCP project — see [Auth methods](#auth-methods) |
 
 ---
 
@@ -88,7 +88,16 @@ python3 -m pip install -e .
 bash setup.sh
 
 # 3. Register with Claude Code
-claude mcp add -s user gemini-bridge -- python3 -m gemini_bridge
+#    API key auth (easiest). Export the key first — keep the quotes, keys can
+#    contain shell-special characters — then reference it with -e so it lands in
+#    the server's own environment. The server name 'gemini-bridge' MUST come
+#    first: omit it and 'claude mcp add' treats 'python3' as the name and the
+#    server shows up as "python3: -m gemini_bridge - ✘ Failed to connect".
+export GEMINI_API_KEY="your-key-here"
+claude mcp add gemini-bridge -s user -e GEMINI_API_KEY="$GEMINI_API_KEY" -- python3 -m gemini_bridge
+
+#    Vertex AI auth (adc / env / keychain) instead? Drop the -e flag:
+#    claude mcp add gemini-bridge -s user -- python3 -m gemini_bridge
 
 # 4. Verify
 claude mcp list
@@ -179,10 +188,14 @@ SA JSON loaded to memory at startup; zero disk artifact after store. `setup.sh` 
 
 **API key (Google AI Studio — no GCP project needed):**
 ```bash
-export GEMINI_API_KEY=AIza...
-# Sets method: "api_key" in config
+# setup.sh sets method: "api_key" in config. Then register the server, passing
+# the key with -e so it reaches the MCP subprocess (a bare shell export does
+# NOT reliably propagate to it). Keep the quotes — keys can contain shell-
+# special characters — and put the server name 'gemini-bridge' first.
+export GEMINI_API_KEY="your-key-here"
+claude mcp add gemini-bridge -s user -e GEMINI_API_KEY="$GEMINI_API_KEY" -- python3 -m gemini_bridge
 ```
-Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). No GCP project, no `gcloud` setup. Lower quota limits than Vertex AI — suitable for personal use and quick setup. The key is read from the env var at startup; it is never written to `config.json`.
+Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). No GCP project, no `gcloud` setup. Lower quota limits than Vertex AI — suitable for personal use and quick setup. The key is injected into the server's environment via `-e` and stored in Claude Code's MCP config; it is never written to gemini-bridge's `config.json`.
 
 **Minimum GCP role for service account:** `roles/aiplatform.user` (renamed from "Vertex AI Platform User" to "Agent Platform User" in 2026 — same role ID `roles/aiplatform.user`). Not required for `api_key` mode.
 
